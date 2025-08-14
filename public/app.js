@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const newChatBtn = document.getElementById('new-chat-btn');
 
     // --- Estado do Aplicativo ---
-    let attachedFiles = []; // Agora é um array para múltiplos ficheiros
+    let attachedFiles = [];
     let currentConversationId = null;
     let chatHistory = [];
 
@@ -148,7 +148,7 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             userParts.push({ inline_data: { mime_type: file.type, data: file.content.split(',')[1] } });
         });
         chatHistory.push({ role: 'user', parts: userParts });
-        const isFirstMessage = chatHistory.filter(m => m.role === 'user').length === 1;
+        const isFirstUserMessageInHistory = chatHistory.filter(m => m.role === 'user').length === 1;
         resetAttachments();
         userInput.value = '';
         userInput.style.height = 'auto';
@@ -159,18 +159,16 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ history: chatHistory }),
             });
-            // **INÍCIO DA CORREÇÃO**
             const contentType = response.headers.get("content-type");
             if (!response.ok || !contentType || !contentType.includes("application/json")) {
                 const errorText = await response.text();
                 throw new Error(errorText || "O servidor retornou uma resposta inválida.");
             }
             const responseData = await response.json();
-            // **FIM DA CORREÇÃO**
             toggleTypingIndicator(false);
             addMessage('bot', responseData.reply);
             chatHistory.push({ role: 'model', parts: [{ text: responseData.reply }] });
-            await saveConversation(isFirstMessage ? userMessageForDisplay : null);
+            await saveConversation(isFirstUserMessageInHistory ? userMessageForDisplay : null);
         } catch (err) {
             toggleTypingIndicator(false);
             addMessage('bot', `Ocorreu um erro: ${err.message}`, { isError: true });
@@ -214,6 +212,8 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
         });
     };
 
+    // --- Funções de Histórico ---
+
     const saveConversation = async (firstUserMessage) => {
         try {
             const conversations = getConversationsFromStorage();
@@ -222,12 +222,18 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
                 if (index !== -1) {
                     conversations[index].chatHistory = chatHistory;
                     conversations[index].timestamp = new Date().toISOString();
+                } else {
+                    // Se o ID atual não for encontrado, cria uma nova conversa para evitar perda de dados
+                    currentConversationId = null; 
                 }
-            } else {
+            }
+            
+            if (!currentConversationId) {
                 const title = firstUserMessage ? await generateTitle(firstUserMessage) : "Nova Perícia";
                 currentConversationId = Date.now();
                 conversations.unshift({ id: currentConversationId, title, timestamp: new Date().toISOString(), chatHistory });
             }
+
             localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
             if (historyPanel.classList.contains('visible')) loadHistoryList();
         } catch (error) {
@@ -245,7 +251,9 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
 
     const getConversationsFromStorage = () => {
         try {
-            const conversations = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const conversationsJSON = localStorage.getItem(STORAGE_KEY);
+            if (!conversationsJSON) return [];
+            const conversations = JSON.parse(conversationsJSON);
             return Array.isArray(conversations) ? conversations : [];
         } catch (e) {
             localStorage.setItem(STORAGE_KEY, '[]');
@@ -277,7 +285,7 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             chatHistory = convo.chatHistory;
             chatContainer.innerHTML = '';
             resetAttachments();
-            chatHistory.slice(1).forEach(turn => {
+            chatHistory.slice(1).forEach(turn => { // Pula o prompt do sistema
                 const textPart = turn.parts.find(p => p.text);
                 const imageParts = turn.parts.filter(p => p.inline_data);
                 const images = imageParts.map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`);
@@ -300,17 +308,14 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             body: JSON.stringify({ history: chatHistory }),
         })
         .then(response => {
-            // **INÍCIO DA CORREÇÃO**
             const contentType = response.headers.get("content-type");
             if (!response.ok || !contentType || !contentType.includes("application/json")) {
                 return response.text().then(text => {
-                    // Tenta extrair uma mensagem de erro do HTML, se houver
                     const match = text.match(/<pre>(.*?)<\/pre>/);
                     throw new Error(match ? match[1] : "O servidor retornou uma resposta inesperada (HTML).");
                 });
             }
             return response.json();
-            // **FIM DA CORREÇÃO**
         })
         .then(data => {
             addMessage('bot', data.reply, { messageId: startupMessageId });
@@ -321,6 +326,18 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             addMessage('bot', errorMessage, { isError: true, messageId: startupMessageId });
         });
         historyPanel.classList.remove('visible');
+    };
+
+    // --- LÓGICA DE INICIALIZAÇÃO ---
+    const initializeApp = () => {
+        const conversations = getConversationsFromStorage();
+        if (conversations.length > 0) {
+            // Se houver conversas, carrega a mais recente
+            loadConversation(conversations[0].id);
+        } else {
+            // Se não houver histórico, inicia uma nova conversa
+            startNewConversation();
+        }
     };
 
     // --- Event Listeners ---
@@ -365,5 +382,5 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
     });
 
     // Inicia o aplicativo
-    startNewConversation();
+    initializeApp();
 });
