@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const CHAT_ENDPOINT = `${API_BASE}/api/generate`;
 
     // --- Elementos do DOM ---
-    const appContainer = document.querySelector('.app-container');
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
@@ -39,11 +38,13 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
 (O restante do prompt foi omitido por brevidade, mas continua o mesmo)
 `;
 
-    // --- **LÓGICA REFINADA PARA GERIR A ALTURA EM DISPOSITIVOS MÓVEIS** ---
+    // --- **LÓGICA DEFINITIVA PARA GERIR A ALTURA EM DISPOSITIVOS MÓVEIS** ---
     const setAppHeight = () => {
         const doc = document.documentElement;
-        // Define a altura com base na altura interna da janela, que é a área visível
-        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        // Usa a altura da janela visual, que se ajusta corretamente ao teclado
+        doc.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+        // Rola a página para garantir que o input esteja visível
+        userInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
     // --- Funções Principais ---
@@ -224,14 +225,23 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
     };
 
     const initializeApp = () => {
-        setAppHeight();
+        // Usa a API visualViewport se disponível, caso contrário, usa o fallback
+        if (window.visualViewport) {
+            setAppHeight();
+            window.visualViewport.addEventListener('resize', setAppHeight);
+        } else {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            window.addEventListener('resize', () => {
+                 doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            });
+        }
+        
         fetch(`${API_BASE}/health`).catch(err => console.warn("Ping inicial para o servidor falhou.", err));
         startNewConversation();
     };
 
     // --- Event Listeners ---
-    window.addEventListener('resize', setAppHeight);
-    
     newChatBtn.addEventListener('click', startNewConversation);
     
     attachBtn.addEventListener('click', () => fileInput.click());
@@ -260,18 +270,6 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     
-    userInput.addEventListener('focus', () => {
-        // Quando o utilizador clica no campo de texto, esperamos um pouco para o teclado aparecer
-        // e depois rolamos a última mensagem para a vista. Isto indiretamente
-        // posiciona a área de introdução de texto corretamente acima do teclado.
-        setTimeout(() => {
-            const lastMessage = chatContainer.lastElementChild;
-            if (lastMessage) {
-                lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }
-        }, 300);
-    });
-
     userInput.addEventListener('input', () => {
         userInput.style.height = 'auto';
         userInput.style.height = (userInput.scrollHeight) + 'px';
