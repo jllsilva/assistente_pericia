@@ -39,10 +39,15 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
 (O restante do prompt foi omitido por brevidade, mas continua o mesmo)
 `;
 
-    // --- Função para ajustar a altura da aplicação ---
-    const setAppHeight = () => {
+    // --- **NOVA LÓGICA PARA GERIR A ALTURA EM DISPOSITIVOS MÓVEIS** ---
+    const setVisualViewport = () => {
         const doc = document.documentElement;
-        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        // Usa a altura da janela visual, que se ajusta ao teclado
+        doc.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+        // Rola a página para garantir que o input esteja visível
+        setTimeout(() => {
+            userInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
     };
 
     // --- Funções Principais ---
@@ -171,7 +176,6 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
         });
     };
 
-    // --- **NOVA FUNÇÃO PARA COMPRIMIR IMAGENS** ---
     const compressImage = (file, maxSize = 1280, quality = 0.7) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -224,14 +228,23 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
     };
 
     const initializeApp = () => {
-        setAppHeight();
+        // **CORREÇÃO:** Usa a nova função de ajuste
+        if (window.visualViewport) {
+            setVisualViewport();
+        } else {
+             // Fallback para navegadores mais antigos
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        }
         fetch(`${API_BASE}/health`).catch(err => console.warn("Ping inicial para o servidor falhou.", err));
         startNewConversation();
     };
 
     // --- Event Listeners ---
-    window.addEventListener('resize', setAppHeight);
-    window.addEventListener('orientationchange', setAppHeight);
+    // **CORREÇÃO:** Ouve o evento de redimensionamento da janela visual
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setVisualViewport);
+    }
 
     newChatBtn.addEventListener('click', startNewConversation);
     
@@ -261,12 +274,6 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     
-    userInput.addEventListener('focus', () => {
-        setTimeout(() => {
-            window.scrollTo(0, document.body.scrollHeight);
-        }, 100);
-    });
-
     userInput.addEventListener('input', () => {
         userInput.style.height = 'auto';
         userInput.style.height = (userInput.scrollHeight) + 'px';
