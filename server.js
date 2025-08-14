@@ -5,7 +5,7 @@ import fetch from 'node-fetch';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Carrega as variáveis de ambiente do arquivo .env
+// Carrega as variáveis de ambiente do ficheiro .env
 dotenv.config();
 
 // --- Configuração de Caminhos para Módulos ES ---
@@ -15,9 +15,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Configurações da API e da Estratégia de Retentativa ---
+// --- Configurações da API ---
 const API_KEY = process.env.GEMINI_API_KEY;
-// **MUDANÇA AQUI:** Atualizado para o novo modelo
 const API_MODEL = 'gemini-2.5-flash-preview-05-20'; 
 const MAX_RETRIES = 3;
 const BACKOFF_BASE_MS = 300;
@@ -29,9 +28,10 @@ if (!API_KEY) {
 
 // --- Middlewares ---
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// **CORREÇÃO:** Aumenta o limite do corpo da requisição para 50mb
+app.use(express.json({ limit: '50mb' })); 
 
-// --- SERVIR ARQUIVOS ESTÁTICOS (FRONTEND) ---
+// --- SERVIR FICHEIROS ESTÁTICOS (FRONTEND) ---
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROTAS DA API ---
@@ -91,35 +91,6 @@ app.post('/api/generate', async (req, res) => {
   res.status(503).json({ error: `O modelo de IA parece estar sobrecarregado ou indisponível. Por favor, tente novamente em alguns instantes.` });
 });
 
-app.post('/api/generate-title', async (req, res) => {
-    try {
-        const { userMessage } = req.body;
-        if (!userMessage) return res.status(400).json({ error: 'A mensagem do usuário é obrigatória para gerar um título.'});
-
-        const titlePrompt = `Crie um título curto e objetivo (máximo 5 palavras) para uma conversa de perícia de incêndio iniciada com a seguinte mensagem. Responda APENAS com o título, sem aspas ou qualquer outra formatação. MENSAGEM: "${userMessage}"`;
-        const body = {
-            contents: [{ parts: [{ text: titlePrompt }] }],
-            generationConfig: { maxOutputTokens: 20 }
-        };
-
-        const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-
-        if (!apiResponse.ok) throw new Error('Falha ao gerar título na API.');
-        
-        const data = await apiResponse.json();
-        const title = data.candidates?.[0]?.content?.parts?.[0]?.text.trim().replace(/"/g, '') || "Nova Perícia";
-        res.json({ title });
-
-    } catch (error) {
-        console.error('[ERRO] Falha ao gerar título:', error);
-        res.status(500).json({ title: "Nova Perícia" });
-    }
-});
-
 // --- ROTA FINAL (FALLBACK) ---
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -127,5 +98,5 @@ app.get('*', (req, res) => {
 
 // Inicia o servidor
 app.listen(PORT, () => {
-  console.log(`Servidor do Assistente de Perícias rodando na porta ${PORT}.`);
+  console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
 });
