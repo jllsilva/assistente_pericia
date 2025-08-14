@@ -2,9 +2,15 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Carrega as variáveis de ambiente do arquivo .env
 dotenv.config();
+
+// --- Configuração de Caminhos para Módulos ES ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,25 +18,28 @@ const PORT = process.env.PORT || 3000;
 // --- Configurações da API e da Estratégia de Retentativa ---
 const API_KEY = process.env.GEMINI_API_KEY;
 const API_MODEL = 'gemini-1.5-flash-latest';
-const MAX_RETRIES = 3; // Número máximo de tentativas
-const BACKOFF_BASE_MS = 300; // Tempo base para a espera exponencial
+const MAX_RETRIES = 3;
+const BACKOFF_BASE_MS = 300;
 
-// Validação crítica: o servidor não pode iniciar sem a chave da API
 if (!API_KEY) {
   console.error('[ERRO CRÍTICO] Variável de ambiente GEMINI_API_KEY não definida.');
-  process.exit(1); // Encerra o processo se a chave não for encontrada
+  process.exit(1);
 }
 
 // --- Middlewares ---
-app.use(cors()); // Habilita o CORS para permitir requisições do frontend
-app.use(express.json({ limit: '10mb' })); // Aumenta o limite do corpo da requisição para aceitar arquivos
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 
-// Rota de "health check" para verificar se o servidor está online
+// --- SERVIR ARQUIVOS ESTÁTICOS (FRONTEND) ---
+// Esta linha diz ao Express para servir os arquivos da pasta 'public'
+app.use(express.static(path.join(__dirname, 'public')));
+
+// --- ROTAS DA API ---
+
 app.get('/health', (req, res) => {
     res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
 });
 
-// Rota principal que lida com a conversa do chat
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
   if (!history || !Array.isArray(history) || history.length === 0) {
@@ -39,7 +48,6 @@ app.post('/api/generate', async (req, res) => {
 
   let lastError = null;
 
-  // Lógica de retentativa com backoff exponencial
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const body = { contents: history };
@@ -83,7 +91,6 @@ app.post('/api/generate', async (req, res) => {
   res.status(503).json({ error: `O modelo de IA parece estar sobrecarregado ou indisponível. Por favor, tente novamente em alguns instantes.` });
 });
 
-// Rota para gerar títulos para as conversas
 app.post('/api/generate-title', async (req, res) => {
     try {
         const { userMessage } = req.body;
@@ -111,6 +118,12 @@ app.post('/api/generate-title', async (req, res) => {
         console.error('[ERRO] Falha ao gerar título:', error);
         res.status(500).json({ title: "Nova Perícia" });
     }
+});
+
+// --- ROTA FINAL (FALLBACK) ---
+// Esta rota garante que qualquer outra requisição receba o app principal.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Inicia o servidor
