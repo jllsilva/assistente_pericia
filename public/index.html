@@ -11,13 +11,12 @@
   <link rel="stylesheet" href="style.css" />
   <!-- Variável global para o endereço do servidor -->
   <script>
-    // Define a URL do servidor de produção (Render)
     window.API_BASE = 'https://assistente-pericia.onrender.com';
   </script>
 </head>
 <body>
 <div class="app-container">
-    <!-- Cabeçalho com a marca e o botão de histórico -->
+    <!-- Cabeçalho -->
     <header class="app-header">
         <div class="brand">
             <h1 class="brand-title">Assistente de Perícias</h1>
@@ -29,27 +28,20 @@
         </div>
     </header>
 
-    <!-- Contêiner principal onde as mensagens do chat são exibidas -->
+    <!-- Contêiner do Chat -->
     <main id="chat-container" class="chat-container"></main>
 
-    <!-- Rodapé com a área de entrada de texto e anexos -->
+    <!-- Rodapé -->
     <footer class="app-footer">
         <!-- Área para exibir previews de arquivos anexados -->
-        <div class="previews-area">
-            <div id="image-preview-container" class="preview-wrapper" style="display: none;">
-                <img id="image-preview" alt="preview" />
-                <button id="remove-file-btn" class="remove-btn" aria-label="Remover imagem">&times;</button>
-            </div>
-            <div id="file-preview-container" class="preview-wrapper" style="display: none;">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                <span id="file-name"></span>
-                <button id="remove-file-btn-generic" class="remove-btn" aria-label="Remover arquivo">&times;</button>
-            </div>
+        <div id="previews-area" class="previews-area">
+            <!-- As pré-visualizações das imagens serão inseridas aqui pelo JavaScript -->
         </div>
         <!-- Área de input principal -->
         <div class="input-area">
-            <input type="file" id="file-input" class="hidden-input" accept="image/*,.pdf,.xml,.txt">
-            <button id="attach-btn" class="icon-button" aria-label="Anexar arquivo">
+            <!-- O input de arquivo agora aceita múltiplos arquivos -->
+            <input type="file" id="file-input" class="hidden-input" accept="image/*" multiple>
+            <button id="attach-btn" class="icon-button" aria-label="Anexar arquivos">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
             </button>
             <textarea id="user-input" class="user-input" placeholder="Descreva o cenário..." rows="1"></textarea>
@@ -57,11 +49,11 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
             </button>
         </div>
-        <p class="version-text">v 1.0 - Assistente de Perícias de Incêndio</p>
+        <p class="version-text">v 1.1 - Assistente de Perícias de Incêndio</p>
     </footer>
 </div>
 
-<!-- Painel lateral para o histórico de conversas -->
+<!-- Painel de Histórico -->
 <aside id="history-panel" class="history-panel hidden">
     <div class="history-header">
         <h2 class="history-title">Histórico</h2>
@@ -73,7 +65,7 @@
     <div id="history-list" class="history-list"></div>
 </aside>
 
-<!-- Scripts (biblioteca de Markdown e o nosso script principal) -->
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="app.js"></script>
 </body>
