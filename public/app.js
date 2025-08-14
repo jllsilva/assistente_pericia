@@ -77,19 +77,9 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
     // --- Funções Principais ---
 
     const addMessage = (sender, message, options = {}) => {
-        const { isError = false, images = [], messageId = null } = options;
-        if (messageId) {
-            const existingWrapper = document.getElementById(messageId);
-            if (existingWrapper) {
-                existingWrapper.innerHTML = '';
-                const bubble = createMessageBubble(sender, message, { isError, images });
-                existingWrapper.appendChild(bubble);
-                return;
-            }
-        }
+        const { isError = false, images = [] } = options;
         const wrapper = document.createElement('div');
         wrapper.className = `message-wrapper ${sender}`;
-        if (messageId) wrapper.id = messageId;
         const bubble = createMessageBubble(sender, message, { isError, images });
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
@@ -223,17 +213,14 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
                     conversations[index].chatHistory = chatHistory;
                     conversations[index].timestamp = new Date().toISOString();
                 } else {
-                    // Se o ID atual não for encontrado, cria uma nova conversa para evitar perda de dados
                     currentConversationId = null; 
                 }
             }
-            
             if (!currentConversationId) {
                 const title = firstUserMessage ? await generateTitle(firstUserMessage) : "Nova Perícia";
                 currentConversationId = Date.now();
                 conversations.unshift({ id: currentConversationId, title, timestamp: new Date().toISOString(), chatHistory });
             }
-
             localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
             if (historyPanel.classList.contains('visible')) loadHistoryList();
         } catch (error) {
@@ -280,18 +267,21 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
     const loadConversation = (id) => {
         const conversations = getConversationsFromStorage();
         const convo = conversations.find(c => c.id === id);
-        if (convo) {
+        if (convo && convo.chatHistory) {
             currentConversationId = id;
             chatHistory = convo.chatHistory;
             chatContainer.innerHTML = '';
             resetAttachments();
-            chatHistory.slice(1).forEach(turn => { // Pula o prompt do sistema
+            chatHistory.slice(1).forEach(turn => {
                 const textPart = turn.parts.find(p => p.text);
                 const imageParts = turn.parts.filter(p => p.inline_data);
                 const images = imageParts.map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`);
                 addMessage(turn.role === 'model' ? 'bot' : 'user', textPart?.text || '', { images });
             });
             historyPanel.classList.remove('visible');
+        } else {
+            console.error(`Não foi possível carregar a conversa com ID: ${id}. A iniciar uma nova conversa.`);
+            startNewConversation();
         }
     };
 
@@ -300,44 +290,20 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
         chatHistory = [{ role: 'user', parts: [{ text: SYSTEM_PROMPT }] }];
         chatContainer.innerHTML = '';
         resetAttachments(); 
-        const startupMessageId = `status-${Date.now()}`;
-        addMessage('bot', 'Aguarde, o assistente está a iniciar...', { messageId: startupMessageId });
-        fetch(CHAT_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ history: chatHistory }),
-        })
-        .then(response => {
-            const contentType = response.headers.get("content-type");
-            if (!response.ok || !contentType || !contentType.includes("application/json")) {
-                return response.text().then(text => {
-                    const match = text.match(/<pre>(.*?)<\/pre>/);
-                    throw new Error(match ? match[1] : "O servidor retornou uma resposta inesperada (HTML).");
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            addMessage('bot', data.reply, { messageId: startupMessageId });
-            chatHistory.push({ role: 'model', parts: [{ text: data.reply }] });
-        })
-        .catch(err => {
-            const errorMessage = err.message || "Não foi possível conectar ao assistente. Tente novamente mais tarde.";
-            addMessage('bot', errorMessage, { isError: true, messageId: startupMessageId });
-        });
+        const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
+        addMessage('bot', welcomeMessage);
+        chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
         historyPanel.classList.remove('visible');
     };
 
     // --- LÓGICA DE INICIALIZAÇÃO ---
     const initializeApp = () => {
-        const conversations = getConversationsFromStorage();
-        if (conversations.length > 0) {
-            // Se houver conversas, carrega a mais recente
-            loadConversation(conversations[0].id);
-        } else {
-            // Se não houver histórico, inicia uma nova conversa
-            startNewConversation();
-        }
+        // Ping inicial para "acordar" o servidor, mas sem bloquear a UI
+        fetch(`${API_BASE}/health`).catch(err => console.warn("Ping inicial para o servidor falhou.", err));
+        
+        // Sempre inicia uma nova conversa para garantir estabilidade.
+        // O utilizador pode carregar conversas antigas a partir do painel de histórico.
+        startNewConversation();
     };
 
     // --- Event Listeners ---
@@ -370,7 +336,9 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             const id = Number(deleteBtn.dataset.id);
             let convos = getConversationsFromStorage().filter(c => c.id !== id);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
-            if (currentConversationId === id) startNewConversation();
+            if (currentConversationId === id) {
+                startNewConversation();
+            }
             loadHistoryList();
         } else if (item) {
             loadConversation(Number(item.dataset.id));
