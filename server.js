@@ -17,7 +17,8 @@ const PORT = process.env.PORT || 3000;
 
 // --- Configurações da API e da Estratégia de Retentativa ---
 const API_KEY = process.env.GEMINI_API_KEY;
-const API_MODEL = 'gemini-1.5-flash-latest';
+// **MUDANÇA AQUI:** Atualizado para o novo modelo
+const API_MODEL = 'gemini-2.5-flash-preview-05-20'; 
 const MAX_RETRIES = 3;
 const BACKOFF_BASE_MS = 300;
 
@@ -31,7 +32,6 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // --- SERVIR ARQUIVOS ESTÁTICOS (FRONTEND) ---
-// Esta linha diz ao Express para servir os arquivos da pasta 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROTAS DA API ---
@@ -121,7 +121,6 @@ app.post('/api/generate-title', async (req, res) => {
 });
 
 // --- ROTA FINAL (FALLBACK) ---
-// Esta rota garante que qualquer outra requisição receba o app principal.
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
