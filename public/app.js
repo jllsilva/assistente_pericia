@@ -38,13 +38,24 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
 (O restante do prompt foi omitido por brevidade, mas continua o mesmo)
 `;
 
-    // --- **LÓGICA DEFINITIVA PARA GERIR A ALTURA EM DISPOSITIVOS MÓVEIS** ---
-    const setAppHeight = () => {
-        const doc = document.documentElement;
-        // Usa a altura da janela visual, que se ajusta corretamente ao teclado
-        doc.style.setProperty('--app-height', `${window.visualViewport.height}px`);
-        // Rola a página para garantir que o input esteja visível
-        userInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // --- SOLUÇÃO PARA PROBLEMA DO TECLADO MOBILE ---
+    const mobileInputHandler = () => {
+        if (!window.visualViewport) return;
+        
+        // Ajusta a altura do container principal
+        const appHeight = window.visualViewport.height;
+        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
+        
+        // Rola a última mensagem para a vista para garantir que o input esteja visível
+        const lastMessage = chatContainer.lastElementChild;
+        if (lastMessage) {
+            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    };
+
+    // --- Função para detectar dispositivos móveis ---
+    const isMobileDevice = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     };
 
     // --- Funções Principais ---
@@ -56,7 +67,13 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
         const bubble = createMessageBubble(sender, message, { isError, images });
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
-        wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+        // Usa scroll suave em desktop e scroll instantâneo em mobile para melhor performance
+        if (!isMobileDevice()) {
+            wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } else {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
     };
 
     const createMessageBubble = (sender, message, options = {}) => {
@@ -225,15 +242,16 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
     };
 
     const initializeApp = () => {
-        // Usa a API visualViewport se disponível, caso contrário, usa o fallback
+        // Configuração do visualViewport para mobile
         if (window.visualViewport) {
-            setAppHeight();
-            window.visualViewport.addEventListener('resize', setAppHeight);
+            mobileInputHandler(); // Configuração inicial
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
         } else {
+            // Fallback para desktop e navegadores mais antigos
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
             window.addEventListener('resize', () => {
-                 doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
             });
         }
         
