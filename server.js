@@ -1,40 +1,48 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import fetch from 'node-fetch';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { GoogleGenerativeAI } from '@langchain/google-genai';
 
-// Carrega as variáveis de ambiente do ficheiro .env
+// Importa nosso novo motor de RAG
+import { initializeRAGEngine } from './rag-engine.js';
+
 dotenv.config();
 
-// --- Configuração de Caminhos para Módulos ES ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// --- Configurações da API ---
 const API_KEY = process.env.GEMINI_API_KEY;
-const API_MODEL = 'gemini-2.5-flash-preview-05-20'; 
-const MAX_RETRIES = 3;
-const BACKOFF_BASE_MS = 300;
 
 if (!API_KEY) {
   console.error('[ERRO CRÍTICO] Variável de ambiente GEMINI_API_KEY não definida.');
   process.exit(1);
 }
 
-// --- Middlewares ---
+// --- PROMPT DO SISTEMA (AGORA NO BACKEND) ---
+const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES DO AGENTE HÍBRIDO ##
+
+Você é o "Assistente de Perícias CBMAL", uma ferramenta especialista de dupla função que atua como:
+1.  **Redator Técnico Colaborativo:** Sua missão principal é transformar os achados de campo do Perito em textos técnicos para o laudo, seguindo os modelos oficiais.
+2.  **Consultor Técnico Sob Demanda:** Sua missão secundária é responder a perguntas diretas e tirar dúvidas técnicas, consultando a base de conhecimento.
+
+**BASE DE CONHECIMENTO:** A sua resposta DEVE ser baseada no CONTEXTO FORNECIDO e no histórico da conversa.
+
+**REGRAS DE OPERAÇÃO:**
+- Se a entrada do usuário parecer uma descrição de achados ou o nome de uma seção de laudo, ative o **MODO REDATOR**.
+- Se a entrada do usuário for uma pergunta clara (contendo "?", "o que é", "qual", "como"), ative o **MODO CONSULTOR**.
+- Ao responder, sempre se baseie primeiro no contexto fornecido.`;
+
+
+// Variável para guardar nosso retriever
+let ragRetriever;
+
 app.use(cors());
-// **CORREÇÃO:** Aumenta o limite do corpo da requisição para 50mb
-app.use(express.json({ limit: '50mb' })); 
-
-// --- SERVIR FICHEIROS ESTÁTICOS (FRONTEND) ---
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// --- ROTAS DA API ---
 
 app.get('/health', (req, res) => {
     res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
@@ -43,60 +51,65 @@ app.get('/health', (req, res) => {
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
   if (!history || !Array.isArray(history) || history.length === 0) {
-    return res.status(400).json({ error: 'O histórico da conversa é obrigatório e não pode ser vazio.' });
+    return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
   }
 
-  let lastError = null;
+  try {
+    // 1. Extrair a última mensagem/pergunta do usuário
+    const latestUserMessage = history[history.length - 1].parts[0].text;
+    
+    // 2. Usar o RAG para buscar contexto relevante na base de conhecimento
+    const contextDocs = await ragRetriever.getRelevantDocuments(latestUserMessage);
+    const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const body = { contents: history };
-      const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+    // 3. Montar o prompt final para o Gemini
+    const finalPrompt = `
+${SYSTEM_PROMPT}
 
-      if (!apiResponse.ok) {
-        const errorText = await apiResponse.text();
-        try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error?.message || `Erro na API: ${apiResponse.status}`);
-        } catch {
-            throw new Error(`Erro na API: ${apiResponse.status} - ${errorText}`);
-        }
-      }
+## CONTEXTO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA:
+${context}
 
-      const data = await apiResponse.json();
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+## HISTÓRICO DA CONVERSA:
+${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
 
-      if (!reply) {
-        throw new Error("A API retornou uma resposta válida, mas vazia.");
-      }
-      
-      console.log(`[Sucesso] Resposta da API recebida na tentativa ${attempt}.`);
-      return res.json({ reply });
+**Sua Resposta (model):**
+`;
+    
+    // 4. Chamar a API do Gemini
+    const model = new GoogleGenerativeAI({ apiKey: API_KEY });
+    const geminiModel = model.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
-    } catch (error) {
-      lastError = error;
-      console.warn(`[AVISO] Tentativa ${attempt}/${MAX_RETRIES} falhou: ${error.message}`);
-      if (attempt < MAX_RETRIES) {
-        const delay = Math.pow(2, attempt - 1) * BACKOFF_BASE_MS + Math.random() * 100;
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+    const result = await geminiModel.generateContent(finalPrompt);
+    const response = result.response;
+    const reply = response.text();
+
+    if (!reply) {
+      throw new Error("A API retornou uma resposta válida, mas vazia.");
     }
-  }
+    
+    console.log(`[Sucesso] Resposta da API gerada com contexto RAG.`);
+    return res.json({ reply });
 
-  console.error(`[ERRO] Todas as ${MAX_RETRIES} tentativas falharam. Último erro:`, lastError);
-  res.status(503).json({ error: `O modelo de IA parece estar sobrecarregado ou indisponível. Por favor, tente novamente em alguns instantes.` });
+  } catch (error) {
+    console.error(`[ERRO] Falha ao gerar resposta:`, error);
+    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
+  }
 });
 
-// --- ROTA FINAL (FALLBACK) ---
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Inicia o servidor
-app.listen(PORT, () => {
-  console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
-});
+// Função para inicializar tudo e iniciar o servidor
+async function startServer() {
+  // Inicializa o motor RAG primeiro
+  ragRetriever = await initializeRAGEngine();
+  
+  // Depois de tudo pronto, inicia o servidor Express
+  app.listen(PORT, () => {
+    console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
+  });
+}
+
+// Inicia o processo
+startServer();
