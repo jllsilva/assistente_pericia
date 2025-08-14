@@ -76,46 +76,35 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
 
     // --- Funções Principais ---
 
-    /** Adiciona uma mensagem à interface do chat */
     const addMessage = (sender, message, options = {}) => {
         const { isError = false, images = [], messageId = null } = options;
-        
-        // Se um ID for fornecido, tenta atualizar uma mensagem existente (ex: "Aguarde...")
         if (messageId) {
             const existingWrapper = document.getElementById(messageId);
             if (existingWrapper) {
-                existingWrapper.innerHTML = ''; // Limpa o conteúdo antigo
-                // Re-cria o balão com a nova mensagem
+                existingWrapper.innerHTML = '';
                 const bubble = createMessageBubble(sender, message, { isError, images });
                 existingWrapper.appendChild(bubble);
                 return;
             }
         }
-
-        // Cria uma nova mensagem se não houver ID
         const wrapper = document.createElement('div');
         wrapper.className = `message-wrapper ${sender}`;
         if (messageId) wrapper.id = messageId;
-        
         const bubble = createMessageBubble(sender, message, { isError, images });
         wrapper.appendChild(bubble);
-
         chatContainer.appendChild(wrapper);
         chatContainer.scrollTop = chatContainer.scrollHeight;
     };
 
-    /** Cria o conteúdo interno de um balão de mensagem */
     const createMessageBubble = (sender, message, options = {}) => {
         const { isError = false, images = [] } = options;
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
         if (isError) bubble.classList.add('error');
-
         const textContent = document.createElement('div');
         textContent.className = 'markdown-content';
         textContent.innerHTML = marked.parse(message || ' ');
         bubble.appendChild(textContent);
-
         if (sender === 'bot' && !isError) {
             const copyButton = document.createElement('button');
             copyButton.className = 'copy-button';
@@ -124,7 +113,6 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             copyButton.onclick = () => navigator.clipboard.writeText(message).catch(err => console.error('Falha ao copiar:', err));
             textContent.appendChild(copyButton);
         }
-        
         if (images.length > 0) {
             const imagesContainer = document.createElement('div');
             imagesContainer.className = 'message-images-container';
@@ -139,57 +127,50 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
         return bubble;
     };
 
-    /** Limpa a área de anexos e o array de ficheiros */
     const resetAttachments = () => {
         attachedFiles = [];
         fileInput.value = '';
         previewsArea.innerHTML = '';
     };
 
-    /** Envia a mensagem do usuário para o backend */
     const sendMessage = async () => {
         const text = userInput.value.trim();
         if (!text && attachedFiles.length === 0) return;
-        
         sendButton.disabled = true;
-
         const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
         const imageContents = attachedFiles.map(file => file.content);
         addMessage('user', userMessageForDisplay, { images: imageContents });
-        
         const userParts = [];
         if (text) {
             userParts.push({ text: text });
         }
-
         attachedFiles.forEach(file => {
             userParts.push({ inline_data: { mime_type: file.type, data: file.content.split(',')[1] } });
         });
-        
         chatHistory.push({ role: 'user', parts: userParts });
-        
         const isFirstMessage = chatHistory.filter(m => m.role === 'user').length === 1;
-        
         resetAttachments();
         userInput.value = '';
         userInput.style.height = 'auto';
         toggleTypingIndicator(true);
-
         try {
-            const res = await fetch(CHAT_ENDPOINT, {
+            const response = await fetch(CHAT_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ history: chatHistory }),
             });
-
-            const responseData = await res.json();
-            if (!res.ok) throw new Error(responseData.error || `Erro ${res.status}`);
-
+            // **INÍCIO DA CORREÇÃO**
+            const contentType = response.headers.get("content-type");
+            if (!response.ok || !contentType || !contentType.includes("application/json")) {
+                const errorText = await response.text();
+                throw new Error(errorText || "O servidor retornou uma resposta inválida.");
+            }
+            const responseData = await response.json();
+            // **FIM DA CORREÇÃO**
             toggleTypingIndicator(false);
             addMessage('bot', responseData.reply);
             chatHistory.push({ role: 'model', parts: [{ text: responseData.reply }] });
             await saveConversation(isFirstMessage ? userMessageForDisplay : null);
-
         } catch (err) {
             toggleTypingIndicator(false);
             addMessage('bot', `Ocorreu um erro: ${err.message}`, { isError: true });
@@ -198,7 +179,6 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
         }
     };
 
-    /** Mostra/esconde o indicador de "a digitar" */
     const toggleTypingIndicator = (show) => {
         let indicator = document.getElementById('typing-indicator');
         if (show) {
@@ -214,16 +194,13 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
         }
     };
 
-    /** Atualiza a área de pré-visualização com as imagens selecionadas */
     const updatePreviews = () => {
         previewsArea.innerHTML = '';
         attachedFiles.forEach((file, index) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'preview-wrapper';
-            
             const img = document.createElement('img');
             img.src = file.content;
-            
             const removeBtn = document.createElement('button');
             removeBtn.className = 'remove-btn';
             removeBtn.innerHTML = '&times;';
@@ -231,14 +208,11 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
                 attachedFiles.splice(index, 1);
                 updatePreviews();
             };
-
             wrapper.appendChild(img);
             wrapper.appendChild(removeBtn);
             previewsArea.appendChild(wrapper);
         });
     };
-
-    // --- Funções de Histórico ---
 
     const saveConversation = async (firstUserMessage) => {
         try {
@@ -303,7 +277,6 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             chatHistory = convo.chatHistory;
             chatContainer.innerHTML = '';
             resetAttachments();
-            
             chatHistory.slice(1).forEach(turn => {
                 const textPart = turn.parts.find(p => p.text);
                 const imageParts = turn.parts.filter(p => p.inline_data);
@@ -319,35 +292,39 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
         chatHistory = [{ role: 'user', parts: [{ text: SYSTEM_PROMPT }] }];
         chatContainer.innerHTML = '';
         resetAttachments(); 
-        
         const startupMessageId = `status-${Date.now()}`;
         addMessage('bot', 'Aguarde, o assistente está a iniciar...', { messageId: startupMessageId });
-
         fetch(CHAT_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ history: chatHistory }),
         })
-        .then(res => {
-            if (!res.ok) return res.json().then(err => Promise.reject(err));
-            return res.json();
+        .then(response => {
+            // **INÍCIO DA CORREÇÃO**
+            const contentType = response.headers.get("content-type");
+            if (!response.ok || !contentType || !contentType.includes("application/json")) {
+                return response.text().then(text => {
+                    // Tenta extrair uma mensagem de erro do HTML, se houver
+                    const match = text.match(/<pre>(.*?)<\/pre>/);
+                    throw new Error(match ? match[1] : "O servidor retornou uma resposta inesperada (HTML).");
+                });
+            }
+            return response.json();
+            // **FIM DA CORREÇÃO**
         })
         .then(data => {
             addMessage('bot', data.reply, { messageId: startupMessageId });
             chatHistory.push({ role: 'model', parts: [{ text: data.reply }] });
         })
         .catch(err => {
-            const errorMessage = err.error || "Não foi possível conectar ao assistente. Tente novamente mais tarde.";
+            const errorMessage = err.message || "Não foi possível conectar ao assistente. Tente novamente mais tarde.";
             addMessage('bot', errorMessage, { isError: true, messageId: startupMessageId });
         });
-        
         historyPanel.classList.remove('visible');
     };
 
     // --- Event Listeners ---
-
     attachBtn.addEventListener('click', () => fileInput.click());
-
     fileInput.addEventListener('change', (e) => {
         const files = e.target.files;
         if (!files) return;
@@ -363,13 +340,11 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             }
         });
     });
-
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     historyBtn.addEventListener('click', () => { loadHistoryList(); historyPanel.classList.add('visible'); });
     closeHistoryBtn.addEventListener('click', () => historyPanel.classList.remove('visible'));
     newChatBtn.addEventListener('click', startNewConversation);
-
     historyList.addEventListener('click', (e) => {
         const item = e.target.closest('.history-item');
         const deleteBtn = e.target.closest('.delete-convo-btn');
@@ -384,7 +359,6 @@ Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga **RIGOROSAMENTE
             loadConversation(Number(item.dataset.id));
         }
     });
-
     userInput.addEventListener('input', () => {
         userInput.style.height = 'auto';
         userInput.style.height = (userInput.scrollHeight) + 'px';
