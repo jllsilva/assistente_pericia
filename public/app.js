@@ -171,6 +171,49 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
         });
     };
 
+    // --- **NOVA FUNÇÃO PARA COMPRIMIR IMAGENS** ---
+    const compressImage = (file, maxSize = 1280, quality = 0.7) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height *= maxSize / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width *= maxSize / height;
+                            height = maxSize;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve({
+                        name: file.name,
+                        type: 'image/jpeg',
+                        content: dataUrl
+                    });
+                };
+                img.onerror = reject;
+                img.src = event.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
     const startNewConversation = () => {
         chatHistory = [{ role: 'user', parts: [{ text: SYSTEM_PROMPT }] }];
         chatContainer.innerHTML = '';
@@ -180,7 +223,6 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
         chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
     };
 
-    // --- LÓGICA DE INICIALIZAÇÃO ---
     const initializeApp = () => {
         setAppHeight();
         fetch(`${API_BASE}/health`).catch(err => console.warn("Ping inicial para o servidor falhou.", err));
@@ -194,21 +236,28 @@ Sempre inicie uma nova perícia com a pergunta abaixo. A sua resposta definirá 
     newChatBtn.addEventListener('click', startNewConversation);
     
     attachBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
+    
+    fileInput.addEventListener('change', async (e) => {
         const files = e.target.files;
-        if (!files) return;
-        attachedFiles = []; 
-        Array.from(files).forEach(file => {
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    attachedFiles.push({ name: file.name, type: file.type, content: ev.target.result });
-                    updatePreviews();
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+        if (!files || files.length === 0) return;
+        
+        previewsArea.innerHTML = `<p class="processing-text">A processar ${files.length} imagem(ns)...</p>`;
+
+        const compressionPromises = Array.from(files)
+            .filter(file => file.type.startsWith('image/'))
+            .map(file => compressImage(file));
+
+        try {
+            const compressedFiles = await Promise.all(compressionPromises);
+            attachedFiles.push(...compressedFiles);
+            updatePreviews();
+        } catch (error) {
+            console.error("Erro ao comprimir imagens:", error);
+            alert("Ocorreu um erro ao processar uma das imagens.");
+            updatePreviews();
+        }
     });
+
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     
