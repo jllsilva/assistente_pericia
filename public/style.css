@@ -122,6 +122,12 @@ html, body {
 .user-input:focus { outline: none; }
 
 .icon-button { padding: 0.625rem; border-radius: 0.5rem; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; transition: background-color 0.2s; }
+/* **CORREÇÃO:** Garante que o SVG dentro do botão seja visível */
+.icon-button svg { 
+    height: 1.5rem; 
+    width: 1.5rem; 
+    stroke: currentColor; 
+}
 .send-button { background: var(--accent-primary); color: black; border-radius: 0.5rem; padding: 0.625rem; border: none; cursor: pointer; align-self: flex-end; }
 .send-button:disabled { background: var(--user-bubble); cursor: not-allowed; }
 .send-button svg { height: 1.5rem; width: 1.5rem; transform: rotate(-90deg); }
