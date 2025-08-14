@@ -101,6 +101,10 @@ html, body {
 .message-bubble img { border-radius: 0.5rem; max-width: 150px; object-fit: cover; }
 
 .markdown-content { position: relative; }
+/* **CORREÇÃO:** Adiciona a cor de destaque para o texto em negrito */
+.markdown-content strong, .markdown-content b {
+    color: var(--accent-primary);
+}
 .copy-button { position: absolute; top: 0; right: 0; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; opacity: 0; transition: opacity 0.2s; padding: 0.25rem; }
 .bot .message-bubble:hover .copy-button { opacity: 0.6; }
 .copy-button:hover { opacity: 1; }
