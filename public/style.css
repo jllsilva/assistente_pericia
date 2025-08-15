@@ -96,11 +96,11 @@ html, body {
 
 .message-bubble { border-radius: 0.75rem; padding: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); max-width: 90%; }
 
-/* PONTO 5: Correção da altura da caixa de mensagem do usuário */
+/* PONTO 2: Correção da altura da caixa de mensagem do usuário */
 .user .message-bubble { 
     background: var(--user-bubble); 
     color: white; 
-    display: inline-block; /* Faz o contêiner ter a largura do conteúdo */
+    padding: 0.4rem 0.75rem; /* Padding vertical reduzido */
 }
 .bot .message-bubble { background: var(--bot-bubble); }
 .message-bubble.error { background-color: var(--error-color); color: white; }
@@ -166,11 +166,10 @@ html, body {
     stroke: currentColor; 
 }
 
-/* PONTO 1: Correção da forma do botão */
+/* PONTO 1: Novo estilo do botão de enviar */
 .send-button { 
-    background: var(--accent-primary); 
-    color: black; 
-    border-radius: 0.5rem;
+    background: transparent; 
+    color: var(--accent-primary); /* Ícone usa a cor de destaque */
     padding: 0.625rem; 
     border: none; 
     cursor: pointer; 
@@ -178,11 +177,24 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 0.5rem; /* Mantém cantos arredondados */
+    transition: background-color 0.2s;
 }
-.send-button:disabled { background: var(--user-bubble); cursor: not-allowed; }
+
+.send-button:hover {
+    background-color: var(--user-bubble); /* Efeito suave ao passar o mouse */
+}
+
+.send-button:disabled { 
+    background: transparent; 
+    cursor: not-allowed; 
+    color: var(--user-bubble);
+}
 .send-button svg { 
     height: 1.5rem; 
     width: 1.5rem; 
+    /* O ícone agora é 'stroke' e precisa de uma cor explícita, que é herdada de 'color' */
+    stroke: currentColor; 
 }
 
 .version-text { text-align: center; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
