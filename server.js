@@ -5,7 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { initializeRAGEngine } from './rag-engine.js';
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+// Não precisaremos mais das classes de mensagem específicas, a nova lógica é mais direta
+// import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 
 dotenv.config();
 
@@ -114,37 +115,45 @@ app.post('/api/generate', async (req, res) => {
         modelName: "gemini-2.5-flash-preview-05-20",
     });
 
-    const systemMessage = new SystemMessage({
-        content: [
-            { type: "text", text: SYSTEM_PROMPT },
-            { type: "text", text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` }
-        ]
-    });
+    // --- LÓGICA DE CONSTRUÇÃO DO HISTÓRICO E CHAMADA DA API TOTALMENTE REESCRITA PARA MAIOR ROBUSTEZ ---
 
-    const conversationHistory = history.map(entry => {
-        const content = entry.parts.map(part => {
+    // 1. Formata as 'parts' do histórico para o formato que a API espera
+    const formattedHistory = history.map(entry => ({
+        role: entry.role,
+        parts: entry.parts.map(part => {
             if (part.text) {
-                return { type: "text", text: part.text };
+                return { text: part.text };
             }
             if (part.inline_data) {
                 return {
-                    type: "image_url",
-                    image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` }
+                    inline_data: {
+                        mime_type: part.inline_data.mime_type,
+                        data: part.inline_data.data
+                    }
                 };
             }
-        });
+        })
+    }));
 
-        if (entry.role === 'user') {
-            return new HumanMessage({ content });
-        } else { // role === 'model'
-            return new AIMessage({ content: content.map(c => c.text).join('') });
-        }
-    });
+    // 2. Cria o prompt final que será enviado, começando com as instruções do sistema
+    const contents = [
+        {
+            role: 'user',
+            parts: [
+                { text: SYSTEM_PROMPT },
+                { text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` }
+            ]
+        },
+        {
+            role: 'model',
+            parts: [{ text: "Entendido. Estou pronto para iniciar a perícia." }]
+        },
+        ...formattedHistory
+    ];
 
-    const fullHistory = [systemMessage, ...conversationHistory];
-    
-    const response = await model.invoke(fullHistory);
-    const reply = response.content;
+    // 3. A chamada para a API agora é mais direta
+    const response = await model.generateContent({ contents });
+    const reply = response.candidates[0].content.parts[0].text;
 
     if (!reply) {
       throw new Error("A API retornou uma resposta válida, mas vazia.");
