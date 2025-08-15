@@ -5,7 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { initializeRAGEngine } from './rag-engine.js';
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+// Adicionando as importações que sua solução utiliza
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 dotenv.config();
 
@@ -21,7 +22,6 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// Usando o prompt completo e validado por você
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES DO AGENTE ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
@@ -81,7 +81,7 @@ Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo
 2.  **Redija o Conteúdo:** Se o perito escolher 1 ou 2, use as respostas da Fase 2 para redigir uma sugestão de texto técnico. Se escolher 3, inicie a FASE 4.
 
 3.  **Peça Confirmação:** APÓS redigir qualquer seção, SEMPRE finalize com a seguinte pergunta de confirmação, informando a próxima etapa lógica:
-    > "Perito, o que acha desta redação? Deseja alterar ou adicionar algo? Se estiver de acordo, podemos prosseguir para a seção de **[NOME DA PRÓXIMA SEÇÃO]**."
+    > "Perito, o que acha desta redação? Deseja alterar ou adicionar algo? Se estiver de acordo, podemos prosseguir para a seção de **[NOME DA PRÓPRIA SEÇÃO]**."
 
 **FASE 4: ANÁLISE DE CORRELAÇÕES (MÉTODO DE EXCLUSÃO)**
 Siga rigorosamente a estrutura de exclusão já definida.
@@ -89,7 +89,6 @@ Siga rigorosamente a estrutura de exclusão já definida.
 
 let ragRetriever;
 
-// A configuração do express.json() já estava correta e será mantida.
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -98,6 +97,7 @@ app.get('/health', (req, res) => {
     res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
 });
 
+// Substituindo toda a função app.post pela sua lógica corrigida e robusta.
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
   if (!history || !Array.isArray(history) || history.length === 0) {
@@ -105,66 +105,64 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    const lastUserEntry = history[history.length - 1];
-    const userText = lastUserEntry.parts.find(p => p.text)?.text || '';
+    const lastUserMessage = history[history.length - 1];
+    const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
 
-    const contextDocs = await ragRetriever.getRelevantDocuments(userText);
+    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-    const model = new ChatGoogleGenerativeAI({
-        apiKey: API_KEY,
-        modelName: "gemini-2.5-flash-preview-05-20",
+    const langChainHistory = history.slice(0, -1).map(msg => {
+      const messageContent = msg.parts[0]?.text || '';
+      return msg.role === 'user'
+        ? new HumanMessage(messageContent)
+        : new AIMessage(messageContent);
     });
 
-    // --- LÓGICA DE CONSTRUÇÃO DO HISTÓRICO RESTAURADA PARA O MÉTODO ESTÁVEL ---
-    const systemMessage = new SystemMessage({
-        content: [
-            { type: "text", text: SYSTEM_PROMPT },
-            { type: "text", text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` }
-        ]
+    const newUserMessageParts = [];
+    
+    newUserMessageParts.push({ 
+        type: "text", 
+        text: `## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}\n\n## MENSAGEM DO PERITO:` 
     });
 
-    const conversationHistory = history.map(entry => {
-        const content = entry.parts.map(part => {
-            if (part.text) {
-                return { type: "text", text: part.text };
-            }
-            if (part.inline_data) {
-                // Formato correto para LangChain com imagens
-                return {
-                    type: "image_url",
-                    image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`
-                };
-            }
+    lastUserMessage.parts.forEach(part => {
+      if ('text' in part && part.text) {
+        newUserMessageParts.push({ type: "text", text: part.text });
+      } else if ('inline_data' in part) {
+        newUserMessageParts.push({
+          type: "image_url",
+          image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`,
         });
-
-        if (entry.role === 'user') {
-            return new HumanMessage({ content });
-        } else { // role === 'model'
-            // O conteúdo de AIMessage deve ser uma string simples
-            const textContent = content.map(c => c.text).join('');
-            return new AIMessage({ content: textContent });
-        }
+      }
     });
 
-    const fullHistory = [systemMessage, ...conversationHistory];
-    
-    // Restaurado o método .invoke() que é mais estável
-    const response = await model.invoke(fullHistory);
+    const messages = [
+      new SystemMessage(SYSTEM_PROMPT),
+      ...langChainHistory,
+      new HumanMessage({ content: newUserMessageParts }),
+    ];
+
+    const chat = new ChatGoogleGenerativeAI({
+        apiKey: API_KEY,
+        modelName: "gemini-2.5-flash-preview-05-20", // Corrigido para o modelo mais novo
+    });
+
+    const response = await chat.invoke(messages);
     const reply = response.content;
-    
-    if (typeof reply !== 'string' || !reply) {
-      throw new Error("A API retornou uma resposta inválida ou vazia.");
+
+    if (!reply) {
+      throw new Error("A API retornou uma resposta válida, mas vazia.");
     }
     
-    console.log(`[Sucesso] Resposta da API gerada.`);
+    console.log(`[Sucesso] Resposta da API gerada com contexto RAG e multimodal.`);
     return res.json({ reply });
 
   } catch (error) {
     console.error(`[ERRO] Falha ao gerar resposta:`, error);
-    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
+    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação: ${error.message}` });
   }
 });
+
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
