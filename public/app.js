@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
     const newChatBtn = document.getElementById('new-chat-btn');
-    // As variáveis de anexo de ficheiro podem ser mantidas para uso futuro
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const previewsArea = document.getElementById('previews-area');
@@ -37,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const textContent = document.createElement('div');
         textContent.className = 'markdown-content';
-        // Usamos a biblioteca 'marked' para renderizar Markdown
         textContent.innerHTML = marked.parse(message || ' ');
         bubble.appendChild(textContent);
         
@@ -53,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sendButton.disabled = true;
         addMessage('user', text);
 
-        // Adiciona a mensagem do usuário ao histórico para enviar ao backend
         chatHistory.push({ role: 'user', parts: [{ text }] });
 
         userInput.value = '';
@@ -75,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const responseData = await response.json();
             toggleTypingIndicator(false);
             addMessage('bot', responseData.reply);
-            // Adiciona a resposta do bot ao histórico
             chatHistory.push({ role: 'model', parts: [{ text: responseData.reply }] });
 
         } catch (err) {
@@ -105,7 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const startNewConversation = () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
-        // Limpa a área de prévias de anexos
         if (document.getElementById('previews-area')) {
             document.getElementById('previews-area').innerHTML = '';
         }
@@ -113,12 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const initializeApp = () => {
-        // Configuração do visualViewport para mobile
         if (window.visualViewport) {
-            mobileInputHandler(); // Configuração inicial
+            mobileInputHandler();
             window.visualViewport.addEventListener('resize', mobileInputHandler);
         } else {
-            // Fallback para desktop e navegadores mais antigos
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
             window.addEventListener('resize', () => {
@@ -138,6 +131,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Inicia o aplicativo
     initializeApp();
 });
