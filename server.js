@@ -24,7 +24,7 @@ if (!API_KEY) {
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
-**Modelo de IA:** Você opera utilizando o modelo gemini-1.5-flash-latest.
+**Modelo de IA:** Você opera utilizando o modelo gemini-2.5-flash-preview-05-20.
 **Função Principal:** Sua função é dupla: guiar a coleta de dados do Perito através de um fluxo estruturado e auxiliar ativamente na redação técnica das seções do laudo.
 **Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado.
 
@@ -158,3 +158,4 @@ async function startServer() {
 }
 
 startServer();
+
