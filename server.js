@@ -5,8 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { initializeRAGEngine } from './rag-engine.js';
-// Não precisaremos mais das classes de mensagem específicas, a nova lógica é mais direta
-// import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 
 dotenv.config();
 
@@ -22,6 +21,7 @@ if (!API_KEY) {
   process.exit(1);
 }
 
+// Usando o prompt completo e validado por você
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES DO AGENTE ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
@@ -89,6 +89,7 @@ Siga rigorosamente a estrutura de exclusão já definida.
 
 let ragRetriever;
 
+// A configuração do express.json() já estava correta e será mantida.
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -115,48 +116,45 @@ app.post('/api/generate', async (req, res) => {
         modelName: "gemini-2.5-flash-preview-05-20",
     });
 
-    // --- LÓGICA DE CONSTRUÇÃO DO HISTÓRICO E CHAMADA DA API TOTALMENTE REESCRITA PARA MAIOR ROBUSTEZ ---
+    // --- LÓGICA DE CONSTRUÇÃO DO HISTÓRICO RESTAURADA PARA O MÉTODO ESTÁVEL ---
+    const systemMessage = new SystemMessage({
+        content: [
+            { type: "text", text: SYSTEM_PROMPT },
+            { type: "text", text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` }
+        ]
+    });
 
-    // 1. Formata as 'parts' do histórico para o formato que a API espera
-    const formattedHistory = history.map(entry => ({
-        role: entry.role,
-        parts: entry.parts.map(part => {
+    const conversationHistory = history.map(entry => {
+        const content = entry.parts.map(part => {
             if (part.text) {
-                return { text: part.text };
+                return { type: "text", text: part.text };
             }
             if (part.inline_data) {
+                // Formato correto para LangChain com imagens
                 return {
-                    inline_data: {
-                        mime_type: part.inline_data.mime_type,
-                        data: part.inline_data.data
-                    }
+                    type: "image_url",
+                    image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`
                 };
             }
-        })
-    }));
+        });
 
-    // 2. Cria o prompt final que será enviado, começando com as instruções do sistema
-    const contents = [
-        {
-            role: 'user',
-            parts: [
-                { text: SYSTEM_PROMPT },
-                { text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` }
-            ]
-        },
-        {
-            role: 'model',
-            parts: [{ text: "Entendido. Estou pronto para iniciar a perícia." }]
-        },
-        ...formattedHistory
-    ];
+        if (entry.role === 'user') {
+            return new HumanMessage({ content });
+        } else { // role === 'model'
+            // O conteúdo de AIMessage deve ser uma string simples
+            const textContent = content.map(c => c.text).join('');
+            return new AIMessage({ content: textContent });
+        }
+    });
 
-    // 3. A chamada para a API agora é mais direta
-    const response = await model.generateContent({ contents });
-    const reply = response.candidates[0].content.parts[0].text;
-
-    if (!reply) {
-      throw new Error("A API retornou uma resposta válida, mas vazia.");
+    const fullHistory = [systemMessage, ...conversationHistory];
+    
+    // Restaurado o método .invoke() que é mais estável
+    const response = await model.invoke(fullHistory);
+    const reply = response.content;
+    
+    if (typeof reply !== 'string' || !reply) {
+      throw new Error("A API retornou uma resposta inválida ou vazia.");
     }
     
     console.log(`[Sucesso] Resposta da API gerada.`);
@@ -167,7 +165,6 @@ app.post('/api/generate', async (req, res) => {
     res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
   }
 });
-
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
