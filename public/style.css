@@ -95,17 +95,21 @@ html, body {
 .message-wrapper.user { justify-content: flex-end; }
 
 .message-bubble { 
-    position: relative; /* Necessário para o posicionamento dos botões de ação */
+    position: relative;
     border-radius: 0.75rem; 
     padding: 0.75rem; 
+    /* PONTO 2: Aumentar padding inferior para dar espaço aos botões */
+    padding-bottom: 3rem; 
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); 
     max-width: 90%; 
 }
 
+/* PONTO 5: Correção final da altura da caixa de mensagem do usuário */
 .user .message-bubble { 
     background: var(--user-bubble); 
     color: white; 
-    padding: 0.4rem 0.75rem;
+    padding: 0.25rem 0.75rem; /* Padding vertical mínimo */
+    line-height: 1.4; /* Altura de linha mais justa */
 }
 .bot .message-bubble { background: var(--bot-bubble); }
 .message-bubble.error { background-color: var(--error-color); color: white; }
@@ -167,10 +171,9 @@ html, body {
     stroke: currentColor; 
 }
 
-/* PONTO 4: Novo estilo do botão de enviar (neutro) */
 .send-button { 
     background: transparent; 
-    color: var(--text-secondary); /* Cor neutra, igual ao botão de anexo */
+    color: var(--text-secondary);
     padding: 0.625rem; 
     border: none; 
     cursor: pointer; 
@@ -197,20 +200,14 @@ html, body {
     stroke: currentColor; 
 }
 
-/* PONTO 1: Estilos para botões de Copiar e Compartilhar */
+/* PONTO 2: Botões de ação sempre visíveis */
 .message-actions {
     position: absolute;
-    bottom: -10px;
+    bottom: 5px;
     right: 5px;
     display: flex;
     gap: 0.25rem;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out, bottom 0.2s ease-in-out;
-}
-
-.bot .message-bubble:hover .message-actions {
-    opacity: 1;
-    bottom: 5px;
+    opacity: 1; /* Sempre visível */
 }
 
 .message-action-btn {
@@ -224,6 +221,7 @@ html, body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 .message-action-btn:hover {
     background-color: #4b5563;
@@ -231,6 +229,10 @@ html, body {
 .message-action-btn svg {
     width: 16px;
     height: 16px;
+}
+/* PONTO 3: Estilo para feedback de 'copiado' */
+.message-action-btn.copied {
+    background-color: #16A34A; /* Verde sucesso */
 }
 
 
