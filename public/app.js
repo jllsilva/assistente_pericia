@@ -10,48 +10,111 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewsArea = document.getElementById('previews-area');
 
     let chatHistory = [];
+    let attachedFiles = []; // Array para guardar os arquivos a serem enviados
 
     // --- FUNÇÕES DE APOIO ---
 
-    const isMobileDevice = () => {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    };
+    const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
-        
         const appHeight = window.visualViewport.height;
         document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
-        
         const lastMessage = chatContainer.lastElementChild;
-        if (lastMessage) {
-            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
+        if (lastMessage) lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
     };
 
-    const addMessage = (sender, message) => {
+    // --- NOVAS FUNÇÕES PARA ANEXO DE ARQUIVOS ---
+
+    const compressImage = (file, maxSize = 1024, quality = 0.7) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = img;
+
+                    if (width > height && width > maxSize) {
+                        height *= maxSize / width;
+                        width = maxSize;
+                    } else if (height > maxSize) {
+                        width *= maxSize / height;
+                        height = maxSize;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve({ name: file.name, type: 'image/jpeg', content: dataUrl });
+                };
+                img.onerror = reject;
+                img.src = event.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const updatePreviews = () => {
+        previewsArea.innerHTML = '';
+        attachedFiles.forEach((file, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'preview-wrapper';
+            const img = document.createElement('img');
+            img.src = file.content;
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '&times;';
+            removeBtn.onclick = () => {
+                attachedFiles.splice(index, 1);
+                updatePreviews();
+            };
+            wrapper.appendChild(img);
+            wrapper.appendChild(removeBtn);
+            previewsArea.appendChild(wrapper);
+        });
+    };
+    
+    const resetAttachments = () => {
+        attachedFiles = [];
+        fileInput.value = ''; // Limpa a seleção de arquivos
+        updatePreviews();
+    };
+
+
+    // --- FUNÇÕES PRINCIPAIS ATUALIZADAS ---
+
+    const addMessage = (sender, message, images = []) => {
         const wrapper = document.createElement('div');
         wrapper.className = `message-wrapper ${sender}`;
-        
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
-        if (message.startsWith('Houve um problema de conexão')) {
-            bubble.classList.add('error');
-        }
+        if (message.startsWith('Houve um problema de conexão')) bubble.classList.add('error');
 
         const textContent = document.createElement('div');
         textContent.className = 'markdown-content';
         textContent.innerHTML = marked.parse(message || ' ');
         bubble.appendChild(textContent);
 
+        if (images.length > 0) {
+            const imagesContainer = document.createElement('div');
+            imagesContainer.className = 'message-images-container';
+            images.forEach(imgBase64 => {
+                const img = document.createElement('img');
+                img.src = imgBase64;
+                imagesContainer.appendChild(img);
+            });
+            bubble.appendChild(imagesContainer);
+        }
+
         if (sender === 'bot') {
             const actionsWrapper = document.createElement('div');
-actionsWrapper.className = 'message-actions';
-
-            // PONTO 3: Lógica de feedback do botão Copiar
+            actionsWrapper.className = 'message-actions';
             const originalCopyIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>`;
             const copiedIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>`;
-
             const copyBtn = document.createElement('button');
             copyBtn.className = 'message-action-btn';
             copyBtn.title = 'Copiar Texto';
@@ -60,51 +123,52 @@ actionsWrapper.className = 'message-actions';
                 navigator.clipboard.writeText(message).then(() => {
                     copyBtn.innerHTML = copiedIcon;
                     copyBtn.classList.add('copied');
-                    setTimeout(() => {
-                        copyBtn.innerHTML = originalCopyIcon;
-                        copyBtn.classList.remove('copied');
-                    }, 2000);
+                    setTimeout(() => { copyBtn.innerHTML = originalCopyIcon; copyBtn.classList.remove('copied'); }, 2000);
                 });
             };
-            
-            // PONTO 4: Ícone de Compartilhar corrigido
             const shareBtn = document.createElement('button');
             shareBtn.className = 'message-action-btn';
             shareBtn.title = 'Compartilhar';
             shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>`;
             shareBtn.onclick = () => {
-                if (navigator.share) {
-                    navigator.share({ text: message });
-                } else {
-                    alert('A função de compartilhar não é suportada neste navegador.');
-                }
+                if (navigator.share) navigator.share({ text: message });
+                else alert('A função de compartilhar não é suportada neste navegador.');
             };
-
             actionsWrapper.appendChild(copyBtn);
-            if (navigator.share) {
-                actionsWrapper.appendChild(shareBtn);
-            }
-            
+            if (navigator.share) actionsWrapper.appendChild(shareBtn);
             bubble.appendChild(actionsWrapper);
         }
         
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
-
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     const sendMessage = async () => {
         const text = userInput.value.trim();
-        if (!text) return;
+        if (!text && attachedFiles.length === 0) return;
 
         sendButton.disabled = true;
-        addMessage('user', text);
+        
+        const imageContents = attachedFiles.map(file => file.content);
+        addMessage('user', text, imageContents);
 
-        chatHistory.push({ role: 'user', parts: [{ text }] });
-
+        const userParts = [];
+        if(text) userParts.push({ text: text });
+        attachedFiles.forEach(file => {
+            userParts.push({
+                inline_data: {
+                    mime_type: file.type,
+                    data: file.content.split(',')[1] // Envia apenas a parte Base64
+                }
+            });
+        });
+        
+        chatHistory.push({ role: 'user', parts: userParts });
+        
         userInput.value = '';
         userInput.style.height = 'auto';
+        resetAttachments();
         toggleTypingIndicator(true);
 
         try {
@@ -116,9 +180,7 @@ actionsWrapper.className = 'message-actions';
 
             if (!response.ok) {
                 const errorText = await response.text();
-                if (errorText.includes('<!DOCTYPE')) {
-                    throw new Error("SERVER_HTML_ERROR");
-                }
+                if (errorText.includes('<!DOCTYPE')) throw new Error("SERVER_HTML_ERROR");
                 const errorData = JSON.parse(errorText);
                 throw new Error(errorData.error || "Ocorreu um erro no servidor.");
             }
@@ -130,40 +192,34 @@ actionsWrapper.className = 'message-actions';
 
         } catch (err) {
             toggleTypingIndicator(false);
-            if (err.message === "SERVER_HTML_ERROR") {
-                addMessage('bot', "Houve um problema de conexão com o servidor. Por favor, aguarde alguns segundos e tente enviar sua mensagem novamente.");
-            } else {
-                addMessage('bot', `Ocorreu um erro: ${err.message}`);
-            }
+            if (err.message === "SERVER_HTML_ERROR") addMessage('bot', "Houve um problema de conexão com o servidor. Por favor, aguarde alguns segundos e tente enviar sua mensagem novamente.");
+            else addMessage('bot', `Ocorreu um erro: ${err.message}`);
         } finally {
             sendButton.disabled = false;
-            if (!isMobileDevice()) {
-                userInput.focus();
-            }
+            if (!isMobileDevice()) userInput.focus();
         }
     };
 
     const toggleTypingIndicator = (show) => {
         let indicator = document.getElementById('typing-indicator');
         if (show) {
-            if (indicator) return;
-            indicator = document.createElement('div');
-            indicator.id = 'typing-indicator';
-            indicator.className = 'message-wrapper bot';
-            indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
-            chatContainer.appendChild(indicator);
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'typing-indicator';
+                indicator.className = 'message-wrapper bot';
+                indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
+                chatContainer.appendChild(indicator);
+            }
             indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
         } else {
-            indicator?.remove();
+            if(indicator) indicator.remove();
         }
     };
     
     const startNewConversation = () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
-        if (document.getElementById('previews-area')) {
-            document.getElementById('previews-area').innerHTML = '';
-        }
+        resetAttachments();
         addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
     };
 
@@ -174,9 +230,7 @@ actionsWrapper.className = 'message-actions';
         } else {
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            window.addEventListener('resize', () => {
-                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            });
+            window.addEventListener('resize', () => { doc.style.setProperty('--app-height', `${window.innerHeight}px`); });
         }
         startNewConversation();
     };
@@ -184,10 +238,27 @@ actionsWrapper.className = 'message-actions';
     // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
+    userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+    
+    // NOVO: Listeners para o botão de anexo
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+        if (!e.target.files) return;
+        
+        const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+        if (files.length === 0) return;
+
+        previewsArea.innerHTML = `<p style="color: var(--text-secondary); font-size: 0.9rem;">Comprimindo ${files.length} imagem(ns)...</p>`;
+
+        try {
+            const compressionPromises = files.map(file => compressImage(file));
+            const compressedFiles = await Promise.all(compressionPromises);
+            attachedFiles.push(...compressedFiles);
+            updatePreviews();
+        } catch (error) {
+            console.error("Erro ao comprimir imagem:", error);
+            alert("Ocorreu um erro ao processar uma das imagens.");
+            updatePreviews(); // Limpa a mensagem de "comprimindo"
         }
     });
 
