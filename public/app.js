@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DE APOIO ---
 
-    // PONTO 2: Adicionada função para detectar dispositivo móvel
     const isMobileDevice = () => {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     };
@@ -36,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
-        if (message.startsWith('Ocorreu um erro:')) {
+        if (message.startsWith('Houve um problema de conexão')) {
             bubble.classList.add('error');
         }
 
@@ -44,11 +43,44 @@ document.addEventListener('DOMContentLoaded', () => {
         textContent.className = 'markdown-content';
         textContent.innerHTML = marked.parse(message || ' ');
         bubble.appendChild(textContent);
+
+        // PONTO 1: Adicionar botões de ação (copiar/compartilhar) nas mensagens do bot
+        if (sender === 'bot') {
+            const actionsWrapper = document.createElement('div');
+            actionsWrapper.className = 'message-actions';
+
+            // Botão de Copiar
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'message-action-btn';
+            copyBtn.title = 'Copiar Texto';
+            copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>`;
+            copyBtn.onclick = () => navigator.clipboard.writeText(message);
+            
+            // Botão de Compartilhar
+            const shareBtn = document.createElement('button');
+            shareBtn.className = 'message-action-btn';
+            shareBtn.title = 'Compartilhar';
+            shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.19.02.38.05.57.09m0 0a2.25 2.25 0 105.364 2.186m0-2.186a2.25 2.25 0 00-5.364-2.186m0 9.75a2.25 2.25 0 005.364 2.186m-5.364-2.186a2.25 2.25 0 010-2.186" /></svg>`;
+            shareBtn.onclick = () => {
+                if (navigator.share) {
+                    navigator.share({ text: message });
+                } else {
+                    alert('A função de compartilhar não é suportada neste navegador.');
+                }
+            };
+
+            actionsWrapper.appendChild(copyBtn);
+            // A função de compartilhar funciona melhor em mobile, então podemos escondê-la em desktop se quisermos
+            if (navigator.share) {
+                actionsWrapper.appendChild(shareBtn);
+            }
+            
+            bubble.appendChild(actionsWrapper);
+        }
         
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
 
-        // PONTO 3: Scroll para o INÍCIO da mensagem
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -73,7 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
+                const errorData = await response.json().catch(() => response.text());
+                // Se a resposta for um texto (como uma página de erro HTML), errorData será esse texto
+                if (typeof errorData === 'string' && errorData.includes('<!DOCTYPE')) {
+                    throw new Error("SERVER_HTML_ERROR"); // Erro específico para HTML
+                }
                 throw new Error(errorData.error || "Ocorreu um erro no servidor.");
             }
 
@@ -84,10 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (err) {
             toggleTypingIndicator(false);
-            addMessage('bot', `Ocorreu um erro: ${err.message}`);
+            // PONTO 3: Lógica para mensagem de erro amigável
+            if (err.message === "SERVER_HTML_ERROR") {
+                addMessage('bot', "Houve um problema de conexão com o servidor. Por favor, aguarde alguns segundos e tente enviar sua mensagem novamente.");
+            } else {
+                addMessage('bot', `Ocorreu um erro: ${err.message}`);
+            }
         } finally {
             sendButton.disabled = false;
-            // PONTO 2: Foco condicional para não abrir o teclado no mobile
             if (!isMobileDevice()) {
                 userInput.focus();
             }
