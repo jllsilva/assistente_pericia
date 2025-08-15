@@ -95,7 +95,13 @@ html, body {
 .message-wrapper.user { justify-content: flex-end; }
 
 .message-bubble { border-radius: 0.75rem; padding: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); max-width: 90%; }
-.user .message-bubble { background: var(--user-bubble); color: white; }
+
+/* PONTO 5: Correção da altura da caixa de mensagem do usuário */
+.user .message-bubble { 
+    background: var(--user-bubble); 
+    color: white; 
+    display: inline-block; /* Faz o contêiner ter a largura do conteúdo */
+}
 .bot .message-bubble { background: var(--bot-bubble); }
 .message-bubble.error { background-color: var(--error-color); color: white; }
 
@@ -113,7 +119,6 @@ html, body {
 .copy-button:hover { opacity: 1; }
 .copy-button svg { height: 1rem; width: 1rem; }
 
-/* PONTO 1: Rodapé Flutuante */
 .app-footer { 
     padding: 0.5rem 1rem; 
     width: 100%; 
@@ -128,7 +133,6 @@ html, body {
 .preview-wrapper img { height: 4.5rem; width: 4.5rem; border-radius: 0.375rem; object-fit: cover; border: 2px solid var(--user-bubble); }
 .remove-btn { position: absolute; top: -0.5rem; right: -0.5rem; background-color: #DC2626; color: white; border-radius: 9999px; height: 1.5rem; width: 1.5rem; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 1rem; }
 
-/* PONTO 5: Textbox com altura reduzida */
 .input-area { 
     max-width: 44rem; 
     margin: 0 auto; 
@@ -141,7 +145,6 @@ html, body {
     border: 1px solid var(--user-bubble); 
 }
 
-/* PONTO 5: Textbox com altura reduzida */
 .user-input { 
     flex-grow: 1; 
     background: transparent; 
@@ -163,11 +166,11 @@ html, body {
     stroke: currentColor; 
 }
 
-/* PONTO 4: Botão circular */
+/* PONTO 1: Correção da forma do botão */
 .send-button { 
     background: var(--accent-primary); 
     color: black; 
-    border-radius: 50%;
+    border-radius: 0.5rem;
     padding: 0.625rem; 
     border: none; 
     cursor: pointer; 
