@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenerativeAI } from '@langchain/google-genai';
+// A importação foi corrigida aqui
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
 // Importa nosso novo motor de RAG
 import { initializeRAGEngine } from './rag-engine.js';
@@ -22,22 +23,16 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// --- PROMPT DO SISTEMA (AGORA NO BACKEND) ---
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES DO AGENTE HÍBRIDO ##
-
 Você é o "Assistente de Perícias CBMAL", uma ferramenta especialista de dupla função que atua como:
 1.  **Redator Técnico Colaborativo:** Sua missão principal é transformar os achados de campo do Perito em textos técnicos para o laudo, seguindo os modelos oficiais.
 2.  **Consultor Técnico Sob Demanda:** Sua missão secundária é responder a perguntas diretas e tirar dúvidas técnicas, consultando a base de conhecimento.
-
 **BASE DE CONHECIMENTO:** A sua resposta DEVE ser baseada no CONTEXTO FORNECIDO e no histórico da conversa.
-
 **REGRAS DE OPERAÇÃO:**
 - Se a entrada do usuário parecer uma descrição de achados ou o nome de uma seção de laudo, ative o **MODO REDATOR**.
 - Se a entrada do usuário for uma pergunta clara (contendo "?", "o que é", "qual", "como"), ative o **MODO CONSULTOR**.
 - Ao responder, sempre se baseie primeiro no contexto fornecido.`;
 
-
-// Variável para guardar nosso retriever
 let ragRetriever;
 
 app.use(cors());
@@ -55,14 +50,10 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    // 1. Extrair a última mensagem/pergunta do usuário
     const latestUserMessage = history[history.length - 1].parts[0].text;
-    
-    // 2. Usar o RAG para buscar contexto relevante na base de conhecimento
     const contextDocs = await ragRetriever.getRelevantDocuments(latestUserMessage);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-    // 3. Montar o prompt final para o Gemini
     const finalPrompt = `
 ${SYSTEM_PROMPT}
 
@@ -75,13 +66,14 @@ ${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
 **Sua Resposta (model):**
 `;
     
-    // 4. Chamar a API do Gemini
-    const model = new GoogleGenerativeAI({ apiKey: API_KEY });
-    const geminiModel = model.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    // A forma de chamar a API foi corrigida aqui
+    const chat = new ChatGoogleGenerativeAI({
+        apiKey: API_KEY,
+        modelName: "gemini-1.5-flash-latest",
+    });
 
-    const result = await geminiModel.generateContent(finalPrompt);
-    const response = result.response;
-    const reply = response.text();
+    const response = await chat.invoke(finalPrompt);
+    const reply = response.content;
 
     if (!reply) {
       throw new Error("A API retornou uma resposta válida, mas vazia.");
@@ -100,16 +92,12 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Função para inicializar tudo e iniciar o servidor
 async function startServer() {
-  // Inicializa o motor RAG primeiro
   ragRetriever = await initializeRAGEngine();
   
-  // Depois de tudo pronto, inicia o servidor Express
   app.listen(PORT, () => {
     console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
   });
 }
 
-// Inicia o processo
 startServer();
