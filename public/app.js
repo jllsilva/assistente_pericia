@@ -10,9 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewsArea = document.getElementById('previews-area');
 
     let chatHistory = [];
-    let attachedFiles = []; // Array para guardar os arquivos a serem enviados
-
-    // --- FUNÇÕES DE APOIO ---
+    let attachedFiles = [];
 
     const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -23,8 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const lastMessage = chatContainer.lastElementChild;
         if (lastMessage) lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
     };
-
-    // --- NOVAS FUNÇÕES PARA ANEXO DE ARQUIVOS ---
 
     const compressImage = (file, maxSize = 1024, quality = 0.7) => {
         return new Promise((resolve, reject) => {
@@ -80,12 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const resetAttachments = () => {
         attachedFiles = [];
-        fileInput.value = ''; // Limpa a seleção de arquivos
+        fileInput.value = '';
         updatePreviews();
     };
-
-
-    // --- FUNÇÕES PRINCIPAIS ATUALIZADAS ---
 
     const addMessage = (sender, message, images = []) => {
         const wrapper = document.createElement('div');
@@ -159,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
             userParts.push({
                 inline_data: {
                     mime_type: file.type,
-                    data: file.content.split(',')[1] // Envia apenas a parte Base64
+                    data: file.content.split(',')[1]
                 }
             });
         });
@@ -220,7 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
         resetAttachments();
-        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
+        const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
+        addMessage('bot', welcomeMessage);
+        
+        // LINHA ADICIONADA: Garante que a primeira mensagem do bot entre para o histórico
+        chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
     };
 
     const initializeApp = () => {
@@ -235,12 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
         startNewConversation();
     };
 
-    // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     
-    // NOVO: Listeners para o botão de anexo
     attachBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', async (e) => {
         if (!e.target.files) return;
@@ -258,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erro ao comprimir imagem:", error);
             alert("Ocorreu um erro ao processar uma das imagens.");
-            updatePreviews(); // Limpa a mensagem de "comprimindo"
+            updatePreviews();
         }
     });
 
