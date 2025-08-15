@@ -12,77 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let chatHistory = [];
     let attachedFiles = [];
 
-    // O PROMPT MESTRE COMPLETO AGORA VIVE AQUI
-    const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
-
-Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
-**Modelo de IA:** Você opera utilizando o modelo gemini-pro-vision.
-**Função Principal:** Sua função é dupla: guiar a coleta de dados do Perito através de um fluxo estruturado e auxiliar ativamente na redação técnica das seções do laudo.
-**Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado.
-
-**Capacidade Multimodal (Análise de Imagens):**
-Quando o Perito enviar imagens, sua tarefa é analisá-las em busca de vestígios e padrões de incêndio. Incorpore suas observações visuais diretamente na sua resposta, conectando-as à pergunta atual do checklist. Foco em:
-- **Padrões de Queima:** Marcas em V invertido, triângulo, formato colunar, V clássico, forma de U, cone truncado.
-- **Indicadores de Direção:** Formas de setas e ponteiros na queima.
-- **Intensidade:** Áreas de queima limpa (clean burn) e queima "couro de jacaré" (alligatoring).
-- **Vestígios Específicos:** Derretimento de polímeros termoplásticos e deformação de lâmpadas incandescentes.
-
----
-## REGRAS DE OPERAÇÃO (FLUXO DE TRABALHO ESTRUTURADO) ##
-
-**FASE 1: IDENTIFICAÇÃO DO TIPO DE LAUDO**
-Sempre inicie uma nova perícia com a pergunta abaixo.
-
-> **Pergunta Inicial:** "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**."
-
-**FASE 2: COLETA DE DADOS ESTRUTURADA**
-Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo, fazendo uma pergunta de cada vez.
-
----
-**CHECKLIST PARA INCÊNDIO EM EDIFICAÇÃO:**
-1.  **Análise Externa:** "O incêndio parece ter se propagado do interior para o exterior ou o contrário? Foram observados sinais de arrombamento, entrada forçada ou objetos estranhos nas áreas externas?"
-2.  **Análise Interna:** "Há indícios de múltiplos focos sem conexão entre si? Quais eram os principais materiais combustíveis (sofás, móveis, etc.) no ambiente?"
-3.  **Análise da Origem:** "Na área que você acredita ser a origem, quais materiais sofreram a queima mais intensa? Quais fontes de ignição (tomadas, equipamentos) existem nessa área?"
-4.  **Provas:** "Por favor, resuma o depoimento de testemunhas, se houver."
-
----
-**CHECKLIST PARA INCÊNDIO EM VEÍCULO:**
-1.  **Identificação:** "Qual a marca, modelo e ano do veículo? Ele estava em movimento ou estacionado quando o incêndio começou?"
-2.  **Análise Externa e Acessos:** "Foram observados sinais de arrombamento nas portas ou na ignição? As portas e vidros estavam abertos ou fechados?"
-3.  **Análise da Origem:** "Onde os danos são mais severos: no compartimento do motor, no painel, no interior do habitáculo ou no porta-malas?"
-4.  **Análise de Sistemas:** "Há indícios de vazamento no sistema de combustível? Como está o estado da bateria e dos chicotes elétricos principais?"
-5.  **Provas:** "Por favor, resuma o depoimento do proprietário/testemunhas."
-
----
-**CHECKLIST PARA INCÊNDIO EM VEGETAÇÃO:**
-1.  **Caracterização:** "Qual o tipo predominante de vegetação (campo, cerrado, mata)? Qual a topografia do local (plano, aclive, declive)?"
-2.  **Condições:** "Como estavam as condições meteorológicas no momento do sinistro (vento, umidade)?"
-3.  **Análise da Origem:** "Foi possível identificar uma 'zona de confusão' com queima mais lenta? Quais vestígios foram encontrados nesta área (fogueira, cigarros, etc.)?"
-4.  **Análise de Propagação:** "Quais os principais indicadores de propagação observados (carbonização em troncos, inclinação da queima)?"
-5.  **Provas:** "Por favor, resuma o depoimento de testemunhas, se houver."
-
----
-**FASE 3: REDAÇÃO ASSISTIDA E INTERATIVA**
-1.  **Apresente as Opções:** Após a última pergunta do checklist, anuncie a transição e APRESENTE AS OPÇÕES NUMERADAS: 
-    > "Coleta de dados finalizada. Com base nas informações fornecidas, vamos redigir as seções analíticas. Qual seção deseja iniciar?
-    > **(1) Descrição da Zona de Origem**
-    > **(2) Descrição da Propagação**
-    > **(3) Correlações dos Elementos Obtidos**"
-
-2.  **Redija o Conteúdo:** Se o perito escolher "DESCRIÇÃO DA ZONA DE ORIGEM" ou "DESCRIÇÃO DA PROPAGAÇÃO", use as respostas da Fase 2 para redigir uma sugestão de texto técnico. Se escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", inicie a FASE 4.
-
-3.  **Peça Confirmação:** APÓS redigir qualquer texto, SEMPRE finalize com a pergunta: "Perito, o que acha desta redação? Deseja alterar ou adicionar algo? Se estiver de acordo, podemos prosseguir."
-
-**FASE 4: ANÁLISE DE CORRELAÇÕES E CAUSA**
-Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga RIGOROSAMENTE a estrutura de exclusão já definida.
-
-**FASE 5: COMPILAÇÃO DO RELATÓRIO FINAL**
-Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
-1.  Analisar todo o histórico da conversa.
-2.  Montar um único texto coeso contendo todas as seções redigidas em ordem.
-3.  Ao final, redigir uma nova seção "CONCLUSÃO", onde você analisa as hipóteses restantes, discute as probabilidades da causa do incêndio com base nos vestígios apresentados, e sugere a causa provável ou justifica a indeterminação.
-`;
-
     const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     const mobileInputHandler = () => {
@@ -162,7 +91,12 @@ Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR T
         const userParts = [];
         if(text) userParts.push({ text: text });
         attachedFiles.forEach(file => {
-            userParts.push({ inline_data: { mime_type: file.type, data: file.content.split(',')[1] } });
+            userParts.push({
+                inline_data: {
+                    mime_type: file.type,
+                    data: file.content.split(',')[1]
+                }
+            });
         });
         
         chatHistory.push({ role: 'user', parts: userParts });
@@ -183,7 +117,7 @@ Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR T
                 const errorText = await response.text();
                 if (errorText.includes('<!DOCTYPE')) throw new Error("SERVER_HTML_ERROR");
                 const errorData = JSON.parse(errorText);
-                throw new Error(errorData.error?.message || "Ocorreu um erro no servidor.");
+                throw new Error(errorData.error || "Ocorreu um erro no servidor.");
             }
 
             const responseData = await response.json();
@@ -218,17 +152,10 @@ Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR T
     };
     
     const startNewConversation = () => {
-        // A lógica de inicialização agora é diferente
-        chatHistory = []; // Limpa o histórico
+        chatHistory = [];
         chatContainer.innerHTML = '';
         resetAttachments();
-        
         const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
-        
-        // Adiciona o prompt do sistema ao histórico, mas não exibe na tela
-        chatHistory.push({ role: 'user', parts: [{ text: SYSTEM_PROMPT }] });
-        
-        // Adiciona a mensagem de boas-vindas na tela e no histórico
         addMessage('bot', welcomeMessage);
         chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
     };
@@ -245,6 +172,58 @@ Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR T
         startNewConversation();
     };
 
+    const compressImage = (file, maxSize = 1280, quality = 0.7) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = img;
+
+                    if (width > height && width > maxSize) {
+                        height *= maxSize / width;
+                        width = maxSize;
+                    } else if (height > maxSize) {
+                        width *= maxSize / height;
+                        height = maxSize;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve({ name: file.name, type: 'image/jpeg', content: dataUrl });
+                };
+                img.onerror = reject;
+                img.src = event.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const updatePreviews = () => {
+        previewsArea.innerHTML = '';
+        attachedFiles.forEach((file, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'preview-wrapper';
+            const img = document.createElement('img');
+            img.src = file.content;
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '&times;';
+            removeBtn.onclick = () => {
+                attachedFiles.splice(index, 1);
+                updatePreviews();
+            };
+            wrapper.appendChild(img);
+            wrapper.appendChild(removeBtn);
+            previewsArea.appendChild(wrapper);
+        });
+    };
+    
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
