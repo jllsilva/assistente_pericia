@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startNewConversation = () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
-        addMessage('bot', "Bom dia, Perito. Para começarmos a redigir o laudo, por favor, informe o número do registro (SAD/SINESP), data e endereço da ocorrência.");
+        addMessage('bot', "Bom dia, Perito. Para começarmos a redigir o laudo, fale um pouco sobre a ocorrência.");
     };
 
     // Event Listeners
@@ -108,3 +108,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicia a conversa
     startNewConversation();
 });
+
