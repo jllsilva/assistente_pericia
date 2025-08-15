@@ -12,6 +12,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let chatHistory = [];
 
+    // --- SOLUÇÃO PARA PROBLEMA DO TECLADO MOBILE ---
+    const mobileInputHandler = () => {
+        if (!window.visualViewport) return;
+        
+        const appHeight = window.visualViewport.height;
+        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
+        
+        const lastMessage = chatContainer.lastElementChild;
+        if (lastMessage) {
+            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    };
+
     const addMessage = (sender, message) => {
         const wrapper = document.createElement('div');
         wrapper.className = `message-wrapper ${sender}`;
@@ -92,10 +105,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const startNewConversation = () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
-        addMessage('bot', "Bom dia, Perito. Para começarmos a redigir o laudo, fale um pouco sobre a ocorrência.");
+        // Limpa a área de prévias de anexos
+        if (document.getElementById('previews-area')) {
+            document.getElementById('previews-area').innerHTML = '';
+        }
+        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
     };
 
-    // Event Listeners
+    const initializeApp = () => {
+        // Configuração do visualViewport para mobile
+        if (window.visualViewport) {
+            mobileInputHandler(); // Configuração inicial
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
+        } else {
+            // Fallback para desktop e navegadores mais antigos
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            window.addEventListener('resize', () => {
+                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            });
+        }
+        startNewConversation();
+    };
+
+    // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => {
@@ -104,8 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
-    
-    // Inicia a conversa
-    startNewConversation();
-});
 
+    // Inicia o aplicativo
+    initializeApp();
+});
