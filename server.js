@@ -5,7 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { initializeRAGEngine } from './rag-engine.js';
-import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 dotenv.config();
 
@@ -21,12 +20,20 @@ if (!API_KEY) {
   process.exit(1);
 }
 
+// PONTO 6: Prompt com mais profundidade técnica e FASE 5 para compilação final
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
 **Modelo de IA:** Você opera utilizando o modelo gemini-1.5-flash-latest.
 **Função Principal:** Sua função é dupla: guiar a coleta de dados do Perito através de um fluxo estruturado e auxiliar ativamente na redação técnica das seções do laudo.
-**Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado, utilizando a terminologia correta da sua base de conhecimento (RAG).
+**Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado.
+
+**Capacidade Multimodal (Análise de Imagens):**
+Quando o Perito enviar imagens, sua tarefa é analisá-las em busca de vestígios e padrões de incêndio. Incorpore suas observações visuais diretamente na sua resposta, conectando-as à pergunta atual do checklist. Foco em:
+- **Padrões de Queima:** Marcas em V invertido, triângulo, formato colunar, V clássico, forma de U, cone truncado.
+- **Indicadores de Direção:** Formas de setas e ponteiros na queima.
+- **Intensidade:** Áreas de queima limpa (clean burn) e queima "couro de jacaré" (alligatoring).
+- **Vestígios Específicos:** Derretimento de polímeros termoplásticos e deformação de lâmpadas incandescentes.
 
 ---
 ## REGRAS DE OPERAÇÃO (FLUXO DE TRABALHO ESTRUTURADO) ##
@@ -87,52 +94,54 @@ Se o Perito solicitar "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
 let ragRetriever;
 
 app.use(cors());
-app.use(express.json()); // Limite padrão é suficiente pois não haverá upload de imagem
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/health', (req, res) => {
+    res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
+});
 
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
-  if (!history || !Array.isArray(history)) {
+  if (!history || !Array.isArray(history) || history.length === 0) {
     return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
   }
 
   try {
-    const textQuery = history[history.length - 1].parts[0].text || '';
-
-    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
+    const latestUserMessage = history[history.length - 1].parts[0].text;
+    const contextDocs = await ragRetriever.getRelevantDocuments(latestUserMessage);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-    const model = new ChatGoogleGenerativeAI({
+    const finalPrompt = `
+${SYSTEM_PROMPT}
+
+## CONTEXTO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA:
+${context}
+
+## HISTÓRICO DA CONVERSA:
+${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
+
+**Sua Resposta (model):**
+`;
+    
+    const chat = new ChatGoogleGenerativeAI({
         apiKey: API_KEY,
-        modelName: "gemini-1.5-flash-latest",
+        modelName: "gemini-2.5-flash-preview-05-20",
     });
 
-    const systemMessage = new SystemMessage({
-        content: `${SYSTEM_PROMPT}\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}`
-    });
-
-    const conversationHistory = history.map(entry => {
-        const textContent = entry.parts.map(p => p.text).join('');
-        return entry.role === 'user'
-            ? new HumanMessage({ content: textContent })
-            : new AIMessage({ content: textContent });
-    });
-
-    const fullHistory = [systemMessage, ...conversationHistory];
-    
-    const response = await model.invoke(fullHistory);
+    const response = await chat.invoke(finalPrompt);
     const reply = response.content;
-    
-    if (typeof reply !== 'string' || !reply) {
-      throw new Error("A API retornou uma resposta inválida ou vazia.");
+
+    if (!reply) {
+      throw new Error("A API retornou uma resposta válida, mas vazia.");
     }
     
-    console.log(`[Sucesso] Resposta da API gerada com RAG.`);
+    console.log(`[Sucesso] Resposta da API gerada com contexto RAG.`);
     return res.json({ reply });
 
   } catch (error) {
     console.error(`[ERRO] Falha ao gerar resposta:`, error);
-    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação: ${error.message}` });
+    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
   }
 });
 
@@ -141,15 +150,11 @@ app.get('*', (req, res) => {
 });
 
 async function startServer() {
-  try {
-    ragRetriever = await initializeRAGEngine();
-    app.listen(PORT, () => {
-      console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
-    });
-  } catch (error) {
-    console.error("[ERRO FATAL] Não foi possível iniciar o servidor:", error);
-    process.exit(1);
-  }
+  ragRetriever = await initializeRAGEngine();
+  
+  app.listen(PORT, () => {
+    console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
+  });
 }
 
 startServer();
