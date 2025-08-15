@@ -77,12 +77,12 @@ Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo
     > **(2) Descrição da Propagação**
     > **(3) Correlações dos Elementos Obtidos**"
 
-2.  **Redija o Conteúdo:** Se o perito escolher "DESCRIÇÃO DA ZONA DE ORIGEM" ou "DESCRIÇÃO DA PROPAGAÇÃO", use as respostas da Fase 2 para redigir uma sugestão de texto técnico. Se escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", inicie a FASE 4.
+2.  **Redija o Conteúdo:** Se o perito escolher "DESCRIÇÃO DA ZONA DE ORIGEM" ou "DESCRIÇÃO DA PROPAGAÇÃO", use as respostas da Fase 2 para redigir uma sugestão de texto técnico. Se escolher "CORRELAÇÕES DOS ELEMENTOS Obtidos", inicie a FASE 4.
 
 3.  **Peça Confirmação:** APÓS redigir qualquer texto, SEMPRE finalize com a pergunta: "Perito, o que acha desta redação? Deseja alterar ou adicionar algo? Se estiver de acordo, podemos prosseguir."
 
 **FASE 4: ANÁLISE DE CORRELAÇÕES E CAUSA**
-Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga RIGOROSAMENTE a estrutura de exclusão já definida.
+Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS Obtidos", siga RIGOROSAMENTE a estrutura de exclusão já definida.
 
 **FASE 5: COMPILAÇÃO DO RELATÓRIO FINAL**
 Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
@@ -111,7 +111,6 @@ app.post('/api/generate', async (req, res) => {
     const lastUserMessage = history[history.length - 1];
     const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
 
-    // BUSCA NA BASE DE CONHECIMENTO (RAG) É FEITA AQUI
     const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
@@ -133,9 +132,10 @@ app.post('/api/generate', async (req, res) => {
                 return { type: "text", text: part.text };
             }
             if (part.inline_data) {
+                // CORREÇÃO CRÍTICA: A sintaxe correta exige um objeto { url: "..." }
                 return {
                     type: "image_url",
-                    image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`
+                    image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` }
                 };
             }
         });
