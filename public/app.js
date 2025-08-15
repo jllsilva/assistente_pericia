@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_ENDPOINT = '/api/generate'; // Aponta para o nosso próprio servidor
+    const API_ENDPOINT = '/api/generate';
 
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
@@ -11,7 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let chatHistory = [];
 
-    // --- SOLUÇÃO PARA PROBLEMA DO TECLADO MOBILE ---
+    // --- FUNÇÕES DE APOIO ---
+
+    // PONTO 2: Adicionada função para detectar dispositivo móvel
+    const isMobileDevice = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    };
+
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
         
@@ -41,7 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
-        wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+        // PONTO 3: Scroll para o INÍCIO da mensagem
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     const sendMessage = async () => {
@@ -79,7 +87,10 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage('bot', `Ocorreu um erro: ${err.message}`);
         } finally {
             sendButton.disabled = false;
-            userInput.focus();
+            // PONTO 2: Foco condicional para não abrir o teclado no mobile
+            if (!isMobileDevice()) {
+                userInput.focus();
+            }
         }
     };
 
