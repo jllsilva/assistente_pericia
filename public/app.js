@@ -6,17 +6,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('send-button');
     const newChatBtn = document.getElementById('new-chat-btn');
     const attachBtn = document.getElementById('attach-btn');
-    
+    const fileInput = document.getElementById('file-input');
+    const previewsArea = document.getElementById('previews-area');
+
     let chatHistory = [];
 
-    const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // --- FUNÇÕES DE APOIO ---
+
+    const isMobileDevice = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    };
 
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
+        
         const appHeight = window.visualViewport.height;
         document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
+        
         const lastMessage = chatContainer.lastElementChild;
-        if (lastMessage) lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        if (lastMessage) {
+            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
     };
 
     const addMessage = (sender, message) => {
@@ -36,9 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (sender === 'bot') {
             const actionsWrapper = document.createElement('div');
-            actionsWrapper.className = 'message-actions';
+actionsWrapper.className = 'message-actions';
+
+            // PONTO 3: Lógica de feedback do botão Copiar
             const originalCopyIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>`;
             const copiedIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>`;
+
             const copyBtn = document.createElement('button');
             copyBtn.className = 'message-action-btn';
             copyBtn.title = 'Copiar Texto';
@@ -47,9 +60,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 navigator.clipboard.writeText(message).then(() => {
                     copyBtn.innerHTML = copiedIcon;
                     copyBtn.classList.add('copied');
-                    setTimeout(() => { copyBtn.innerHTML = originalCopyIcon; copyBtn.classList.remove('copied'); }, 2000);
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalCopyIcon;
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
                 });
             };
+            
+            // PONTO 4: Ícone de Compartilhar corrigido
             const shareBtn = document.createElement('button');
             shareBtn.className = 'message-action-btn';
             shareBtn.title = 'Compartilhar';
@@ -61,15 +79,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('A função de compartilhar não é suportada neste navegador.');
                 }
             };
+
             actionsWrapper.appendChild(copyBtn);
             if (navigator.share) {
                 actionsWrapper.appendChild(shareBtn);
             }
+            
             bubble.appendChild(actionsWrapper);
         }
         
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
+
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -140,9 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const startNewConversation = () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
-        const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
-        addMessage('bot', welcomeMessage);
-        chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
+        if (document.getElementById('previews-area')) {
+            document.getElementById('previews-area').innerHTML = '';
+        }
+        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
     };
 
     const initializeApp = () => {
@@ -168,9 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
-    
-    // O botão de anexo não tem funcionalidade nesta versão estável
-    attachBtn.style.display = 'none'; // Oculta o botão de anexo
 
     initializeApp();
 });
