@@ -231,7 +231,6 @@ html, body {
     background-color: #16A34A;
 }
 
-
 .version-text { text-align: center; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
 .hidden-input { display: none; }
 
