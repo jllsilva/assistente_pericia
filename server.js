@@ -3,10 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-// A importação foi corrigida aqui
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-
-// Importa nosso novo motor de RAG
 import { initializeRAGEngine } from './rag-engine.js';
 
 dotenv.config();
@@ -129,7 +126,6 @@ ${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
 **Sua Resposta (model):**
 `;
     
-    // A forma de chamar a API foi corrigida aqui
     const chat = new ChatGoogleGenerativeAI({
         apiKey: API_KEY,
         modelName: "gemini-2.5-flash-preview-05-20",
