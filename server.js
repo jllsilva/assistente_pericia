@@ -24,7 +24,7 @@ if (!API_KEY) {
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
-**Modelo de IA:** Você opera utilizando o modelo gemini-pro-vision.
+**Modelo de IA:** Você opera utilizando o modelo gemini-1.5-flash-latest.
 **Função Principal:** Sua função é dupla: guiar a coleta de dados do Perito através de um fluxo estruturado e auxiliar ativamente na redação técnica das seções do laudo.
 **Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado, utilizando a terminologia correta da sua base de conhecimento (RAG).
 
@@ -77,18 +77,18 @@ Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo
     > **(2) Descrição da Propagação**
     > **(3) Correlações dos Elementos Obtidos**"
 
-2.  **Redija o Conteúdo:** Se o perito escolher "DESCRIÇÃO DA ZONA DE ORIGEM" ou "DESCRIÇÃO DA PROPAGAÇÃO", use as respostas da Fase 2 para redigir uma sugestão de texto técnico. Se escolher "CORRELAÇÕES DOS ELEMENTOS Obtidos", inicie a FASE 4.
+2.  **Redija o Conteúdo:** Se o perito escolher uma seção, redija o texto técnico correspondente.
 
 3.  **Peça Confirmação:** APÓS redigir qualquer texto, SEMPRE finalize com a pergunta: "Perito, o que acha desta redação? Deseja alterar ou adicionar algo? Se estiver de acordo, podemos prosseguir."
 
 **FASE 4: ANÁLISE DE CORRELAÇÕES E CAUSA**
-Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS Obtidos", siga RIGOROSAMENTE a estrutura de exclusão já definida.
+Se o perito escolher "CORRELAÇÕES DOS ELEMENTOS OBTIDOS", siga RIGOROSAMENTE a estrutura de exclusão.
 
 **FASE 5: COMPILAÇÃO DO RELATÓRIO FINAL**
-Se, ao final do processo, o Perito solicitar o "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
-1.  Analisar todo o histórico da conversa.
-2.  Montar um único texto coeso contendo todas as seções redigidas em ordem.
-3.  Ao final, redigir uma nova seção "CONCLUSÃO", onde você analisa as hipóteses restantes, discute as probabilidades da causa do incêndio com base nos vestígios apresentados, e sugere a causa provável ou justifica a indeterminação.
+Se o Perito solicitar "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
+1.  Analisar o histórico.
+2.  Montar um único texto coeso com as seções redigidas.
+3.  Criar uma nova seção "CONCLUSÃO" com a análise de probabilidades da causa.
 `;
 
 let ragRetriever;
@@ -97,13 +97,9 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/health', (req, res) => {
-    res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
-});
-
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
-  if (!history || !Array.isArray(history) || history.length === 0) {
+  if (!history || !Array.isArray(history)) {
     return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
   }
 
@@ -116,7 +112,7 @@ app.post('/api/generate', async (req, res) => {
 
     const model = new ChatGoogleGenerativeAI({
         apiKey: API_KEY,
-        modelName: "gemini-pro-vision",
+        modelName: "gemini-1.5-flash-latest",
     });
 
     const systemMessage = new SystemMessage({
@@ -132,7 +128,6 @@ app.post('/api/generate', async (req, res) => {
                 return { type: "text", text: part.text };
             }
             if (part.inline_data) {
-                // CORREÇÃO CRÍTICA: A sintaxe correta exige um objeto { url: "..." }
                 return {
                     type: "image_url",
                     image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` }
@@ -142,7 +137,7 @@ app.post('/api/generate', async (req, res) => {
 
         if (entry.role === 'user') {
             return new HumanMessage({ content });
-        } else { // role === 'model'
+        } else {
             const textContent = content.map(c => c.text).join('');
             return new AIMessage({ content: textContent });
         }
@@ -171,11 +166,15 @@ app.get('*', (req, res) => {
 });
 
 async function startServer() {
-  ragRetriever = await initializeRAGEngine();
-  
-  app.listen(PORT, () => {
-    console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
-  });
+  try {
+    ragRetriever = await initializeRAGEngine();
+    app.listen(PORT, () => {
+      console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
+    });
+  } catch (error) {
+    console.error("[ERRO FATAL] Não foi possível iniciar o servidor:", error);
+    process.exit(1);
+  }
 }
 
 startServer();
