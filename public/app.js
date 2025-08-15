@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lastMessage) lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
     };
 
-    const compressImage = (file, maxSize = 1024, quality = 0.7) => {
+    const compressImage = (file, maxSize = 1280, quality = 0.7) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (event) => {
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
         addMessage('bot', welcomeMessage);
         
-        // LINHA ADICIONADA: Garante que a primeira mensagem do bot entre para o histórico
+        // CORREÇÃO CRÍTICA PARA O BUG DA MENSAGEM REPETIDA
         chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
     };
 
