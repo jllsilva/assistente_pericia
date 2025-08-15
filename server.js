@@ -135,7 +135,7 @@ ${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
     // A forma de chamar a API foi corrigida aqui
     const chat = new ChatGoogleGenerativeAI({
         apiKey: API_KEY,
-        modelName: "gemini-1.5-flash-latest",
+        modelName: "gemini-2.5-flash-preview-05-20",
     });
 
     const response = await chat.invoke(finalPrompt);
@@ -167,4 +167,5 @@ async function startServer() {
 }
 
 startServer();
+
 
