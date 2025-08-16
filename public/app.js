@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: file.name,
                         type: 'image/jpeg',
                         content: dataUrl,
-                        base64: dataUrl.split(',')[1]
+                        base64: dataUrl.split(',')[1] // Extrai apenas o dado Base64
                     });
                 };
                 img.onerror = reject;
@@ -189,10 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sendButton.disabled = true;
 
+        // Mostra a mensagem do usuário com as imagens que ele anexou
         const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
         const imageContentsForDisplay = attachedFiles.map(file => file.content);
         addMessage('user', userMessageForDisplay, { images: imageContentsForDisplay });
 
+        // Monta o payload para o backend
         const userParts = [];
         if (text) {
             userParts.push({ text: text });
@@ -274,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initializeApp = () => {
         if (window.visualViewport) {
             mobileInputHandler();
-            window.visualViewport.addEventListener('resize', mobileInputHandler);
+            window.visualViewport.addEventListener('resize', handleViewportResize);
         } else {
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
