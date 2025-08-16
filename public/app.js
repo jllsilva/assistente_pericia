@@ -259,26 +259,29 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const startNewConversation = () => {
-        chatHistory = [];
-        chatContainer.innerHTML = '';
-        resetAttachments();
-        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
-    };
+    chatHistory = [];
+    chatContainer.innerHTML = '';
+    resetAttachments();
+    // PONTO 2: A mensagem inicial agora é adicionada ao histórico aqui.
+    const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
+    addMessage('bot', welcomeMessage);
+    chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
+};
 
     const initializeApp = () => {
-        if (window.visualViewport) {
-            mobileInputHandler();
-            window.visualViewport.addEventListener('resize', mobileInputHandler);
-        } else {
-            const doc = document.documentElement;
+    if (window.visualViewport) {
+        mobileInputHandler();
+        window.visualViewport.addEventListener('resize', mobileInputHandler);
+    } else {
+        const doc = document.documentElement;
+        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        window.addEventListener('resize', () => {
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            window.addEventListener('resize', () => {
-                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            });
-        }
-        startNewConversation();
-    };
-
+        });
+    }
+    // PONTO 2: A chamada para startNewConversation é a única coisa aqui.
+    startNewConversation();
+};
     // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
@@ -314,3 +317,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeApp();
 });
+
