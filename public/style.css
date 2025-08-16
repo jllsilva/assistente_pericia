@@ -5,7 +5,6 @@
     --text-secondary: #9CA3AF;
     --accent-primary: #F59E0B;
     --accent-secondary: #D97706;
-    --accent-primary-pulse: rgba(245, 158, 11, 0.2);
     --user-bubble: #374151;
     --bot-bubble: #1F2937;
     --error-color: #EF4444;
@@ -98,25 +97,19 @@ html, body {
 .message-bubble { 
     position: relative;
     border-radius: 0.75rem; 
+    padding: 0.75rem; 
+    padding-bottom: 3rem; 
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); 
     max-width: 90%; 
-    line-height: 1.5;
 }
 
-/* PONTO 1: Correção do padding do balão do bot */
-.bot .message-bubble {
-    background: var(--bot-bubble);
-    padding: 1rem;
-    padding-bottom: 3rem; 
-}
-
-/* PONTO 1: Correção do padding do balão do usuário */
 .user .message-bubble { 
     background: var(--user-bubble); 
     color: white; 
-    padding: 0.6rem 1rem;
+    padding: 0.25rem 0.75rem;
+    line-height: 1.4;
 }
-
+.bot .message-bubble { background: var(--bot-bubble); }
 .message-bubble.error { background-color: var(--error-color); color: white; }
 
 .message-images-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
@@ -235,20 +228,7 @@ html, body {
     height: 16px;
 }
 .message-action-btn.copied {
-    background-color: #16A34A; /* Verde sucesso */
-}
-
-@keyframes pulse {
-    0%, 100% {
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-    }
-    50% {
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 0 0 4px var(--accent-primary-pulse);
-    }
-}
-
-#typing-indicator .message-bubble {
-    animation: pulse 2s infinite ease-in-out;
+    background-color: #16A34A;
 }
 
 
