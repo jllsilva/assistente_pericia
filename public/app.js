@@ -8,9 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const previewsArea = document.getElementById('previews-area');
+    const appContainer = document.querySelector('.app-container');
 
     let chatHistory = [];
-    let attachedFiles = []; // Variável para guardar os ficheiros anexados
+    let attachedFiles = [];
 
     // --- FUNÇÕES DE APOIO ---
 
@@ -20,13 +21,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
-        
-        const appHeight = window.visualViewport.height;
-        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
+        const viewportHeight = window.visualViewport.height;
+        appContainer.style.height = `${viewportHeight}px`;
         
         const lastMessage = chatContainer.lastElementChild;
-        if (lastMessage) {
-            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        if(lastMessage) {
+           lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    };
+
+    const initializeMobileHandlers = () => {
+        if (isMobileDevice()) {
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', handleViewportResize);
+            }
         }
     };
 
@@ -43,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
             bubble.classList.add('error');
         }
 
-        // Adiciona o container de imagens se houver
         if (images.length > 0) {
             const imagesContainer = document.createElement('div');
             imagesContainer.className = 'message-images-container';
@@ -182,12 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sendButton.disabled = true;
 
-        // Mostra a mensagem do usuário com as imagens que ele anexou
         const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
         const imageContentsForDisplay = attachedFiles.map(file => file.content);
         addMessage('user', userMessageForDisplay, { images: imageContentsForDisplay });
 
-        // Monta o payload para o backend
         const userParts = [];
         if (text) {
             userParts.push({ text: text });
@@ -224,94 +229,4 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(errorData.error || "Ocorreu um erro no servidor.");
             }
 
-            const responseData = await response.json();
-            toggleTypingIndicator(false);
-            addMessage('bot', responseData.reply);
-            chatHistory.push({ role: 'model', parts: [{ text: responseData.reply }] });
-
-        } catch (err) {
-            toggleTypingIndicator(false);
-            if (err.message === "SERVER_HTML_ERROR") {
-                addMessage('bot', "Houve um problema de conexão com o servidor. Por favor, aguarde alguns segundos e tente enviar sua mensagem novamente.");
-            } else {
-                addMessage('bot', `Ocorreu um erro: ${err.message}`);
-            }
-        } finally {
-            sendButton.disabled = false;
-            if (!isMobileDevice()) {
-                userInput.focus();
-            }
-        }
-    };
-
-    const toggleTypingIndicator = (show) => {
-        let indicator = document.getElementById('typing-indicator');
-        if (show) {
-            if (indicator) return;
-            indicator = document.createElement('div');
-            indicator.id = 'typing-indicator';
-            indicator.className = 'message-wrapper bot';
-            indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
-            chatContainer.appendChild(indicator);
-            indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        } else {
-            indicator?.remove();
-        }
-    };
-    
-    const startNewConversation = () => {
-        chatHistory = [];
-        chatContainer.innerHTML = '';
-        resetAttachments();
-        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
-    };
-
-    const initializeApp = () => {
-        if (window.visualViewport) {
-            mobileInputHandler();
-            window.visualViewport.addEventListener('resize', mobileInputHandler);
-        } else {
-            const doc = document.documentElement;
-            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            window.addEventListener('resize', () => {
-                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            });
-        }
-        startNewConversation();
-    };
-
-    // --- Event Listeners ---
-    newChatBtn.addEventListener('click', startNewConversation);
-    sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-
-    attachBtn.addEventListener('click', () => fileInput.click());
-
-    fileInput.addEventListener('change', async (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-
-        previewsArea.innerHTML = `<p class="processing-text">Processando imagens...</p>`;
-
-        const compressionPromises = Array.from(files)
-            .filter(file => file.type.startsWith('image/'))
-            .map(file => compressImage(file));
-
-        try {
-            const compressedFiles = await Promise.all(compressionPromises);
-            attachedFiles.push(...compressedFiles);
-            updatePreviews();
-        } catch (error) {
-            console.error("Erro ao comprimir imagens:", error);
-            alert("Ocorreu um erro ao processar uma das imagens.");
-            updatePreviews(); // Limpa a mensagem de "processando"
-        }
-    });
-
-    initializeApp();
-});
+            const responseData = await response.j
