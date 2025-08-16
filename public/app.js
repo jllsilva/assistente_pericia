@@ -8,10 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const previewsArea = document.getElementById('previews-area');
-    const appContainer = document.querySelector('.app-container');
 
     let chatHistory = [];
-    let attachedFiles = [];
+    let attachedFiles = []; // Variável para guardar os ficheiros anexados
 
     // --- FUNÇÕES DE APOIO ---
 
@@ -21,20 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
-        const viewportHeight = window.visualViewport.height;
-        appContainer.style.height = `${viewportHeight}px`;
+        
+        const appHeight = window.visualViewport.height;
+        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
         
         const lastMessage = chatContainer.lastElementChild;
-        if(lastMessage) {
-           lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
-    };
-
-    const initializeMobileHandlers = () => {
-        if (isMobileDevice()) {
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', handleViewportResize);
-            }
+        if (lastMessage) {
+            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
     };
 
@@ -51,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bubble.classList.add('error');
         }
 
+        // Adiciona o container de imagens se houver
         if (images.length > 0) {
             const imagesContainer = document.createElement('div');
             imagesContainer.className = 'message-images-container';
@@ -276,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initializeApp = () => {
         if (window.visualViewport) {
             mobileInputHandler();
-            window.visualViewport.addEventListener('resize', handleViewportResize);
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
         } else {
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
@@ -285,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         startNewConversation();
-        initializeMobileHandlers();
     };
 
     // --- Event Listeners ---
@@ -317,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erro ao comprimir imagens:", error);
             alert("Ocorreu um erro ao processar uma das imagens.");
-            updatePreviews();
+            updatePreviews(); // Limpa a mensagem de "processando"
         }
     });
 
