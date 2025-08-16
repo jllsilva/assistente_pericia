@@ -5,6 +5,8 @@
     --text-secondary: #9CA3AF;
     --accent-primary: #F59E0B;
     --accent-secondary: #D97706;
+    /* PONTO 2: Adicionada cor para a animação de pulsação */
+    --accent-primary-pulse: rgba(245, 158, 11, 0.2);
     --user-bubble: #374151;
     --bot-bubble: #1F2937;
     --error-color: #EF4444;
@@ -97,21 +99,24 @@ html, body {
 .message-bubble { 
     position: relative;
     border-radius: 0.75rem; 
-    padding: 0.75rem; 
-    /* PONTO 2: Aumentar padding inferior para dar espaço aos botões */
-    padding-bottom: 3rem; 
+    padding: 1rem; /* Padding base */
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); 
     max-width: 90%; 
 }
 
-/* PONTO 5: Correção final da altura da caixa de mensagem do usuário */
+/* PONTO 1: Padding do balão do bot ajustado para dar espaço aos botões */
+.bot .message-bubble {
+    background: var(--bot-bubble);
+    padding-bottom: 3rem; 
+}
+
+/* PONTO 1: Padding do balão do usuário significativamente diminuído */
 .user .message-bubble { 
     background: var(--user-bubble); 
     color: white; 
-    padding: 0.25rem 0.75rem; /* Padding vertical mínimo */
-    line-height: 1.4; /* Altura de linha mais justa */
+    padding: 0.6rem 1rem; /* Padding ajustado para ser mais justo */
 }
-.bot .message-bubble { background: var(--bot-bubble); }
+
 .message-bubble.error { background-color: var(--error-color); color: white; }
 
 .message-images-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
@@ -200,14 +205,13 @@ html, body {
     stroke: currentColor; 
 }
 
-/* PONTO 2: Botões de ação sempre visíveis */
 .message-actions {
     position: absolute;
     bottom: 5px;
     right: 5px;
     display: flex;
     gap: 0.25rem;
-    opacity: 1; /* Sempre visível */
+    opacity: 1;
 }
 
 .message-action-btn {
@@ -230,9 +234,23 @@ html, body {
     width: 16px;
     height: 16px;
 }
-/* PONTO 3: Estilo para feedback de 'copiado' */
 .message-action-btn.copied {
     background-color: #16A34A; /* Verde sucesso */
+}
+
+/* PONTO 2: Animação de pulsação para o indicador de "a pensar" */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    }
+    50% {
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 0 0 4px var(--accent-primary-pulse);
+    }
+}
+
+/* PONTO 2: Aplica a animação ao balão do indicador */
+#typing-indicator .message-bubble {
+    animation: pulse 2s infinite ease-in-out;
 }
 
 
