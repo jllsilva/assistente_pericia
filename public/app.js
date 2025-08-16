@@ -8,9 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const previewsArea = document.getElementById('previews-area');
+    const appContainer = document.querySelector('.app-container');
 
     let chatHistory = [];
-    let attachedFiles = []; // Variável para guardar os ficheiros anexados
+    let attachedFiles = [];
 
     // --- FUNÇÕES DE APOIO ---
 
@@ -43,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
             bubble.classList.add('error');
         }
 
-        // Adiciona o container de imagens se houver
         if (images.length > 0) {
             const imagesContainer = document.createElement('div');
             imagesContainer.className = 'message-images-container';
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: file.name,
                         type: 'image/jpeg',
                         content: dataUrl,
-                        base64: dataUrl.split(',')[1] // Extrai apenas o dado Base64
+                        base64: dataUrl.split(',')[1]
                     });
                 };
                 img.onerror = reject;
@@ -182,12 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sendButton.disabled = true;
 
-        // Mostra a mensagem do usuário com as imagens que ele anexou
         const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
         const imageContentsForDisplay = attachedFiles.map(file => file.content);
         addMessage('user', userMessageForDisplay, { images: imageContentsForDisplay });
 
-        // Monta o payload para o backend
         const userParts = [];
         if (text) {
             userParts.push({ text: text });
@@ -251,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator = document.createElement('div');
             indicator.id = 'typing-indicator';
             indicator.className = 'message-wrapper bot';
+            // Adicionada a animação de três pontos dentro do balão que pulsa
             indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
             chatContainer.appendChild(indicator);
             indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -309,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erro ao comprimir imagens:", error);
             alert("Ocorreu um erro ao processar uma das imagens.");
-            updatePreviews(); // Limpa a mensagem de "processando"
+            updatePreviews();
         }
     });
 
