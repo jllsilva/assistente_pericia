@@ -21,13 +21,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
-        
-        const appHeight = window.visualViewport.height;
-        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
+        const viewportHeight = window.visualViewport.height;
+        appContainer.style.height = `${viewportHeight}px`;
         
         const lastMessage = chatContainer.lastElementChild;
-        if (lastMessage) {
-            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        if(lastMessage) {
+           lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    };
+
+    const initializeMobileHandlers = () => {
+        if (isMobileDevice()) {
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', handleViewportResize);
+            }
         }
     };
 
@@ -249,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator = document.createElement('div');
             indicator.id = 'typing-indicator';
             indicator.className = 'message-wrapper bot';
-            // Adicionada a animação de três pontos dentro do balão que pulsa
             indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
             chatContainer.appendChild(indicator);
             indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -259,29 +265,27 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const startNewConversation = () => {
-    chatHistory = [];
-    chatContainer.innerHTML = '';
-    resetAttachments();
-    // PONTO 2: A mensagem inicial agora é adicionada ao histórico aqui.
-    const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
-    addMessage('bot', welcomeMessage);
-    chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
-};
+        chatHistory = [];
+        chatContainer.innerHTML = '';
+        resetAttachments();
+        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
+    };
 
     const initializeApp = () => {
-    if (window.visualViewport) {
-        mobileInputHandler();
-        window.visualViewport.addEventListener('resize', mobileInputHandler);
-    } else {
-        const doc = document.documentElement;
-        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-        window.addEventListener('resize', () => {
+        if (window.visualViewport) {
+            mobileInputHandler();
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
+        } else {
+            const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-        });
-    }
-    // PONTO 2: A chamada para startNewConversation é a única coisa aqui.
-    startNewConversation();
-};
+            window.addEventListener('resize', () => {
+                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            });
+        }
+        startNewConversation();
+        initializeMobileHandlers();
+    };
+
     // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
@@ -317,4 +321,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeApp();
 });
-
