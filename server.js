@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { initializeRAGEngine } from './rag-engine.js';
 
 dotenv.config();
@@ -20,16 +21,13 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// PONTO 6: Prompt com mais profundidade técnica e FASE 5 para compilação final
+// Seu novo e detalhado SYSTEM_PROMPT
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
-**Modelo de IA:** Você opera utilizando o modelo gemini-2.5-flash-preview-05-20.
+**Modelo de IA:** Você opera utilizando o modelo gemini-1.5-flash-latest.
 **Função Principal:** Sua função é dupla: guiar a coleta de dados do Perito através de um fluxo estruturado e auxiliar ativamente na redação técnica das seções do laudo.
 **Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado.
-**Base de Conhecimeto principal:** Você opera utilizando principalmente os Manuais do CBMDF, CBMGO e a NFPA 921.
-
-**quando perguntarem quem você é, o que você faz ou qual é sua base de conhecimento. Responda: "Sou o Analista Assistente de Perícia do CBMAL, um chatbot especializado na investigação de incêndios. Auxilio na coleta estruturada de dados, análise de imagens e redação técnica de laudos, principalmente com base nos manuais do CBMDF, CBMGO e na NFPA 921."**
 
 **Capacidade Multimodal (Análise de Imagens):**
 Quando o Perito enviar imagens, sua tarefa é analisá-las em busca de vestígios e padrões de incêndio. Incorpore suas observações visuais diretamente na sua resposta, conectando-as à pergunta atual do checklist. Foco em:
@@ -111,40 +109,64 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    const latestUserMessage = history[history.length - 1].parts[0].text;
-    const contextDocs = await ragRetriever.getRelevantDocuments(latestUserMessage);
+    const lastUserMessage = history[history.length - 1];
+    const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
+
+    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-    const finalPrompt = `
-${SYSTEM_PROMPT}
-
-## CONTEXTO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA:
-${context}
-
-## HISTÓRICO DA CONVERSA:
-${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
-
-**Sua Resposta (model):**
-`;
-    
-    const chat = new ChatGoogleGenerativeAI({
-        apiKey: API_KEY,
-        modelName: "gemini-2.5-flash-preview-05-20",
+    const langChainHistory = history.slice(0, -1).map(msg => {
+      const messageContent = msg.parts.map(part => {
+        if ('text' in part) return part.text;
+        return ''; // Ignora imagens no histórico antigo para simplificar
+      }).join(' ');
+      return msg.role === 'user'
+        ? new HumanMessage(messageContent)
+        : new AIMessage(messageContent);
     });
 
-    const response = await chat.invoke(finalPrompt);
+    const newUserMessageParts = [];
+    
+    newUserMessageParts.push({ 
+        type: "text", 
+        text: `## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}\n\n## MENSAGEM DO PERITO:` 
+    });
+
+    lastUserMessage.parts.forEach(part => {
+      if ('text' in part && part.text) {
+        newUserMessageParts.push({ type: "text", text: part.text });
+      } else if ('inline_data' in part) {
+        newUserMessageParts.push({
+          type: "image_url",
+          image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`,
+        });
+      }
+    });
+
+    const messages = [
+      new SystemMessage(SYSTEM_PROMPT),
+      ...langChainHistory,
+      new HumanMessage({ content: newUserMessageParts }),
+    ];
+
+    const chat = new ChatGoogleGenerativeAI({
+        apiKey: API_KEY,
+        modelName: "gemini-1.5-flash-latest",
+    });
+
+    const response = await chat.invoke(messages);
     const reply = response.content;
 
     if (!reply) {
       throw new Error("A API retornou uma resposta válida, mas vazia.");
     }
     
-    console.log(`[Sucesso] Resposta da API gerada com contexto RAG.`);
+    console.log(`[Sucesso] Resposta da API gerada com contexto RAG e multimodal.`);
     return res.json({ reply });
 
   } catch (error) {
     console.error(`[ERRO] Falha ao gerar resposta:`, error);
-    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
+    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação: ${error.message}` });
   }
 });
 
@@ -161,6 +183,3 @@ async function startServer() {
 }
 
 startServer();
-
-
-
