@@ -2,9 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
+import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { initializeRAGEngine } from './rag-engine.js';
 
 dotenv.config();
@@ -15,6 +14,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.GEMINI_API_KEY;
+const API_MODEL = 'gemini-2.5-flash-preview-05-20'; // Usando o modelo que você confirmou que funciona
 
 if (!API_KEY) {
   console.error('[ERRO CRÍTICO] Variável de ambiente GEMINI_API_KEY não definida.');
@@ -24,7 +24,7 @@ if (!API_KEY) {
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
-**Modelo de IA:** Você opera utilizando o modelo gemini-1.5-flash-latest.
+**Modelo de IA:** Você opera utilizando o modelo ${API_MODEL}.
 **Função Principal:** Sua função é dupla: guiar a coleta de dados do Perito através de um fluxo estruturado e auxiliar ativamente na redação técnica das seções do laudo.
 **Diretriz de Qualidade:** Ao redigir textos técnicos, seja detalhado e aprofundado.
 
@@ -78,7 +78,7 @@ Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo
 
 ---
 **FASE 3: REDAÇÃO ASSISTIDA E INTERATIVA**
-1.  **Apresente as Opções:** Após a última pergunta do checklist, anuncie a transição e APRESENTE AS OPções NUMERADAS:
+1.  **Apresente as Opções:** Após a última pergunta do checklist, anuncie a transição e APRESENTE AS OPÇÕES NUMERADAS:
     > "Coleta de dados finalizada. Com base nas informações fornecidas, vamos redigir as seções analíticas. Qual seção deseja iniciar?
     > **(1) Descrição da Zona de Origem**
     > **(2) Descrição da Propagação**
@@ -110,73 +110,76 @@ app.get('/health', (req, res) => {
 
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
-  
-  // Permite histórico vazio para iniciar a conversa, mas exige para continuar
-  if (!history || !Array.isArray(history)) {
-    return res.status(400).json({ error: 'O histórico da conversa é inválido.' });
+  if (!history) {
+    return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
   }
 
   try {
-    // Se o histórico estiver vazio, preparamos uma mensagem de "início" para a IA
-    // Se não, pegamos a última mensagem do usuário como antes
-    const isFirstMessage = history.length === 0;
-    const lastUserMessage = isFirstMessage ? { role: 'user', parts: [{ text: '' }] } : history[history.length - 1];
-    
-    // Extrai o texto da última mensagem do usuário para usar no RAG
-    const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
-    
+    const lastUserMessage = history[history.length - 1] || { parts: [] };
+    const textQuery = lastUserMessage.parts.find(p => p.text)?.text || '';
+
+    // 1. Usar RAG para obter contexto (continua usando LangChain para isso)
     const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-    // Constrói o histórico para o LangChain (sem a última mensagem)
-    const langChainHistory = history.slice(0, -1).map(msg => {
-      const messageContent = msg.parts.map(part => {
-        if ('text' in part) return part.text;
-        return ''; // Ignora imagens no histórico antigo para simplificar
-      }).join(' ');
-      return msg.role === 'user'
-        ? new HumanMessage(messageContent)
-        : new AIMessage(messageContent);
-    });
-
-    // Constrói a nova mensagem do usuário com texto, imagens e contexto do RAG
-    const newUserMessageParts = [];
-    newUserMessageParts.push({ 
-        type: "text", 
-        text: `## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}\n\n## MENSAGEM DO PERITO:` 
-    });
-
-    lastUserMessage.parts.forEach(part => {
-      if ('text' in part && part.text) {
-        newUserMessageParts.push({ type: "text", text: part.text });
-      } else if ('inline_data' in part) {
-        newUserMessageParts.push({
-          type: "image_url",
-          image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`,
-        });
-      }
-    });
-
-    // Monta o payload final para a API
-    const messages = [
-      new SystemMessage(SYSTEM_PROMPT),
-      ...langChainHistory,
-      new HumanMessage({ content: newUserMessageParts }),
+    // 2. Montar o corpo da requisição para a API nativa
+    const fullHistory = [
+        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+        { role: 'model', parts: [{ text: "Entendido. Estou pronto para atuar como Analista Assistente de Perícia CBMAL." }] },
+        ...history
     ];
+    
+    // Adiciona o contexto do RAG à última mensagem do usuário, se houver uma última mensagem
+    if (fullHistory.length > 2) { // Garante que não adicione contexto a uma conversa vazia
+        const lastMessageWithContext = fullHistory[fullHistory.length - 1];
+        const contextPart = { text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` };
+        
+        // Insere o contexto no início das partes da última mensagem
+        if (lastMessageWithContext.parts && Array.isArray(lastMessageWithContext.parts)) {
+            lastMessageWithContext.parts.unshift(contextPart);
+        } else {
+            lastMessageWithContext.parts = [contextPart];
+        }
+    }
 
-    const chat = new ChatGoogleGenerativeAI({
-        apiKey: API_KEY,
-        modelName: "gemini-2.5-pro",
+    const body = { 
+        contents: fullHistory,
+        // Adicione aqui configurações de geração se necessário
+        // generationConfig: { ... }
+    };
+
+    // 3. Fazer a chamada direta à API com node-fetch
+    const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30000) // Timeout de 30 segundos
     });
 
-    const response = await chat.invoke(messages);
-    const reply = response.content;
+    if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        throw new Error(errorData.error?.message || `API Error: ${apiResponse.status}`);
+    }
 
-    if (!reply) {
-      throw new Error("A API retornou uma resposta válida, mas vazia.");
+    const data = await apiResponse.json();
+    
+    // Tratamento robusto da resposta da API
+    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts) {
+        // Se a resposta for bloqueada por segurança, o campo 'candidates' pode estar ausente
+        if (data.promptFeedback && data.promptFeedback.blockReason) {
+            console.warn(`[AVISO] Resposta bloqueada por segurança: ${data.promptFeedback.blockReason}`);
+            throw new Error(`A resposta foi bloqueada por razões de segurança: ${data.promptFeedback.blockReason}`);
+        }
+        throw new Error("A API retornou uma resposta em formato inesperado ou vazia.");
     }
     
-    console.log(`[Sucesso] Resposta da API gerada com contexto RAG e multimodal.`);
+    const reply = data.candidates[0].content.parts[0].text;
+
+    if (reply === undefined || reply === null) {
+      throw new Error("A API retornou uma resposta válida, mas sem conteúdo de texto.");
+    }
+    
+    console.log(`[Sucesso] Resposta da API gerada com método direto.`);
     return res.json({ reply });
 
   } catch (error) {
@@ -198,7 +201,3 @@ async function startServer() {
 }
 
 startServer();
-
-
-
-
