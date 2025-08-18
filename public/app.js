@@ -30,14 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const initializeMobileHandlers = () => {
-        if (isMobileDevice()) {
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', handleViewportResize);
-            }
-        }
-    };
-
     // --- FUNÇÕES DE CRIAÇÃO DE MENSAGENS ---
 
     const addMessage = (sender, message, options = {}) => {
@@ -296,19 +288,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const initializeApp = () => {
-        if (window.visualViewport) {
-            mobileInputHandler();
-            window.visualViewport.addEventListener('resize', mobileInputHandler);
-        } else {
-            const doc = document.documentElement;
+    if (window.visualViewport) {
+        mobileInputHandler(); // Executa uma vez ao carregar
+        window.visualViewport.addEventListener('resize', mobileInputHandler); // E de novo sempre que a tela mudar de tamanho
+    } else {
+        const doc = document.documentElement;
+        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        window.addEventListener('resize', () => {
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            window.addEventListener('resize', () => {
-                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-            });
-        }
-        startNewConversation();
-        initializeMobileHandlers();
-    };
+        });
+    }
+    startNewConversation();
+    // A chamada para initializeMobileHandlers() pode ser removida daqui
+};
 
     // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
@@ -345,5 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeApp();
 });
+
 
 
