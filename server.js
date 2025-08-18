@@ -28,11 +28,12 @@ const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS
     1. Guiar a coleta de dados do Perito através de um fluxo estruturado.
     2. Auxiliar ativamente na redação técnica das seções do laudo de incêndio.
 - **Estilo de Redação:** Sempre redigir em linguagem técnica, formal, impessoal, clara e precisa, utilizando a terceira pessoa.
-- **Análise Multimodal (Imagens):** Ao receber imagens, sua tarefa é analisá-las em busca de vestígios e padrões de incêndio. Incorpore suas observações visuais diretamente na sua resposta, conectando-as ao contexto do laudo. Se não houver elementos claros, afirme isso. Foco em:
+- **Quando receber imagens, analise padrões de queima, intensidade e vestígios: Se houver evidências claras, descreva-as tecnicamente.
     - **Padrões de Queima:** Marcas em V invertido, triângulo, formato colunar, V clássico, forma de U, cone truncado.
     - **Indicadores de Direção:** Formas de setas e ponteiros na queima.
     - **Intensidade:** Áreas de queima limpa (clean burn) e queima "couro de jacaré" (alligatoring).
     - **Vestígios Específicos:** Derretimento de polímeros termoplásticos e deformação de lâmpadas incandescentes.
+    - **Se não houver, declare explicitamente que não foram observados vestígios relevantes e siga a pergunta do checklist.
 
 ---
 
@@ -240,4 +241,5 @@ async function startServer() {
 }
 
 startServer();
+
 
