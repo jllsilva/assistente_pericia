@@ -1,17 +1,12 @@
-// =================================================================
-//  1. IMPORTAÇÕES DE MÓDULOS
-// =================================================================
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { initializeRAGEngine } from './rag-engine.js';
 
-// =================================================================
-//  2. CONFIGURAÇÃO INICIAL E VARIÁVEIS DE AMBIENTE
-// =================================================================
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,15 +16,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// Validação crítica da chave de API na inicialização
 if (!API_KEY) {
   console.error('[ERRO CRÍTICO] Variável de ambiente GEMINI_API_KEY não definida.');
   process.exit(1);
 }
 
-// =================================================================
-//  3. PROMPT DO SISTEMA (A "PERSONALIDADE" DO ASSISTENTE)
-// =================================================================
+// Seu novo e detalhado SYSTEM_PROMPT
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
@@ -100,26 +92,16 @@ Se o Perito solicitar "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
 3.  Criar uma nova seção "CONCLUSÃO" com a análise de probabilidades da causa.
 `;
 
-// =================================================================
-//  4. CONFIGURAÇÃO DO SERVIDOR EXPRESS
-// =================================================================
-let ragRetriever; // Variável global para armazenar o motor RAG
+let ragRetriever;
 
-// Middlewares essenciais
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Permite o upload de anexos grandes
-app.use(express.static(path.join(__dirname, 'public'))); // Serve os ficheiros do frontend
+app.use(express.json({ limit: '50mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// =================================================================
-//  5. DEFINIÇÃO DAS ROTAS DA APLICAÇÃO
-// =================================================================
-
-// Rota para verificação de saúde do servidor
 app.get('/health', (req, res) => {
     res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
 });
 
-// Rota principal da API para gerar respostas do chatbot
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
   if (!history || !Array.isArray(history) || history.length === 0) {
@@ -127,70 +109,77 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    // Extrai a última mensagem do usuário para a busca RAG
-    const latestUserMessage = history[history.length - 1].parts[0].text;
-    
-    // Busca na base de conhecimento
-    const contextDocs = await ragRetriever.getRelevantDocuments(latestUserMessage);
+    const lastUserMessage = history[history.length - 1];
+    const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
+
+    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
-    // Monta o prompt final com todas as informações
-    const finalPrompt = `
-${SYSTEM_PROMPT}
-
-## CONTEXTO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA:
-${context}
-
-## HISTÓRICO DA CONVERSA:
-${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
-
-**Sua Resposta (model):**
-`;
-    
-    // Configura e chama o modelo de IA
-    const chat = new ChatGoogleGenerativeAI({
-        apiKey: API_KEY,
-        modelName: "gemini-1.5-flash-latest", // Corrigido para o modelo mais recente
+    const langChainHistory = history.slice(0, -1).map(msg => {
+      const messageContent = msg.parts.map(part => {
+        if ('text' in part) return part.text;
+        return ''; // Ignora imagens no histórico antigo para simplificar
+      }).join(' ');
+      return msg.role === 'user'
+        ? new HumanMessage(messageContent)
+        : new AIMessage(messageContent);
     });
 
-    const response = await chat.invoke(finalPrompt);
+    const newUserMessageParts = [];
+    
+    newUserMessageParts.push({ 
+        type: "text", 
+        text: `## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}\n\n## MENSAGEM DO PERITO:` 
+    });
+
+    lastUserMessage.parts.forEach(part => {
+      if ('text' in part && part.text) {
+        newUserMessageParts.push({ type: "text", text: part.text });
+      } else if ('inline_data' in part) {
+        newUserMessageParts.push({
+          type: "image_url",
+          image_url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`,
+        });
+      }
+    });
+
+    const messages = [
+      new SystemMessage(SYSTEM_PROMPT),
+      ...langChainHistory,
+      new HumanMessage({ content: newUserMessageParts }),
+    ];
+
+    const chat = new ChatGoogleGenerativeAI({
+        apiKey: API_KEY,
+        modelName: "gemini-1.5-flash-latest",
+    });
+
+    const response = await chat.invoke(messages);
     const reply = response.content;
 
     if (!reply) {
       throw new Error("A API retornou uma resposta válida, mas vazia.");
     }
     
-    console.log(`[Sucesso] Resposta da API gerada com contexto RAG.`);
+    console.log(`[Sucesso] Resposta da API gerada com contexto RAG e multimodal.`);
     return res.json({ reply });
 
   } catch (error) {
     console.error(`[ERRO] Falha ao gerar resposta:`, error);
-    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
+    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação: ${error.message}` });
   }
 });
 
-// Rota fallback: serve o index.html para qualquer outra requisição GET
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// =================================================================
-//  6. INICIALIZAÇÃO DO SERVIDOR
-// =================================================================
-
-/**
- * Função principal que inicializa o motor RAG e, em seguida,
- * inicia o servidor Express para receber requisições.
- */
 async function startServer() {
-  // Primeiro, carrega a base de conhecimento na memória
   ragRetriever = await initializeRAGEngine();
   
-  // Após a base de conhecimento estar pronta, inicia o servidor
   app.listen(PORT, () => {
     console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
   });
 }
 
-// Inicia todo o processo
 startServer();
