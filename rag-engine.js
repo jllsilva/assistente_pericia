@@ -1,9 +1,9 @@
-import { DirectoryLoader } from "langchain/document_loaders/fs/directory";
-import { DocxLoader } from "langchain/document_loaders/fs/docx";
-import { PDFLoader } from "langchain/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import { DirectoryLoader } from "@langchain/community/document_loaders/fs/directory";
+import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { RecursiveCharacterTextSplitter } from "@langchain/text_splitters";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { MemoryVectorStore } from "@langchain/community/vectorstores/memory";
 
 // Esta função irá inicializar todo o nosso motor de busca
 export async function initializeRAGEngine() {
@@ -14,7 +14,7 @@ export async function initializeRAGEngine() {
     const loader = new DirectoryLoader(
       './knowledge_base',
       {
-        '.pdf': (path) => new PDFLoader(path, { splitPages: false }), // Adicionado splitPages: false para robustez
+        '.pdf': (path) => new PDFLoader(path, { splitPages: false }),
         '.docx': (path) => new DocxLoader(path),
       }
     );
@@ -49,6 +49,7 @@ export async function initializeRAGEngine() {
 
   } catch (error) {
     console.error('[RAG Engine] Falha ao inicializar a base de conhecimento:', error);
-    process.exit(1);
+    // Não encerra o processo, apenas retorna um retriever que não faz nada
+    return { getRelevantDocuments: () => Promise.resolve([]) };
   }
 }
