@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // =================================================================
-    //  1. CONSTANTES E SELEÇÃO DE ELEMENTOS DO DOM
-    // =================================================================
     const API_ENDPOINT = '/api/generate';
 
     const chatContainer = document.getElementById('chat-container');
@@ -11,24 +8,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const previewsArea = document.getElementById('previews-area');
-    const appContainer = document.querySelector('.app-container'); // Adicionado para o handler mobile
 
-    // =================================================================
-    //  2. ESTADO DA APLICAÇÃO
-    // =================================================================
     let chatHistory = [];
-    let attachedFiles = [];
+    let attachedFiles = []; // Variável para guardar os ficheiros anexados
 
-    // =================================================================
-    //  3. FUNÇÕES DE MANIPULAÇÃO DO DOM E UI
-    // =================================================================
+    // --- FUNÇÕES DE APOIO ---
 
-    /**
-     * Adiciona uma nova mensagem (do usuário ou do bot) à interface do chat.
-     * @param {string} sender - 'user' ou 'bot'.
-     * @param {string} message - O conteúdo de texto da mensagem.
-     * @param {object} options - Opções adicionais, como imagens.
-     */
+    const isMobileDevice = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    };
+
+    const mobileInputHandler = () => {
+        if (!window.visualViewport) return;
+        
+        const appHeight = window.visualViewport.height;
+        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
+        
+        const lastMessage = chatContainer.lastElementChild;
+        if (lastMessage) {
+            lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    };
+
+    // --- FUNÇÕES DE CRIAÇÃO DE MENSAGENS ---
+
     const addMessage = (sender, message, options = {}) => {
         const { images = [] } = options;
         const wrapper = document.createElement('div');
@@ -40,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bubble.classList.add('error');
         }
 
+        // Adiciona o container de imagens se houver
         if (images.length > 0) {
             const imagesContainer = document.createElement('div');
             imagesContainer.className = 'message-images-container';
@@ -105,34 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    /**
-     * Mostra ou esconde o indicador de "digitando..." do bot.
-     * @param {boolean} show - True para mostrar, false para esconder.
-     */
-    const toggleTypingIndicator = (show) => {
-        let indicator = document.getElementById('typing-indicator');
-        if (show) {
-            if (indicator) return;
-            indicator = document.createElement('div');
-            indicator.id = 'typing-indicator';
-            indicator.className = 'message-wrapper bot';
-            indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
-            chatContainer.appendChild(indicator);
-            indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        } else {
-            indicator?.remove();
-        }
-    };
+    // --- LÓGICA DE ANEXOS ---
 
-    // =================================================================
-    //  4. LÓGICA DE ANEXOS E COMPRESSÃO DE IMAGENS
-    // =================================================================
-
-    /**
-     * Comprime e redimensiona uma imagem.
-     * @param {File} file - O ficheiro de imagem a ser processado.
-     * @returns {Promise<object>} Um objeto com os dados da imagem comprimida.
-     */
     const compressImage = (file, maxSize = 1280, quality = 0.7) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -159,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: file.name,
                         type: 'image/jpeg',
                         content: dataUrl,
-                        base64: dataUrl.split(',')[1]
+                        base64: dataUrl.split(',')[1] // Extrai apenas o dado Base64
                     });
                 };
                 img.onerror = reject;
@@ -170,9 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    /**
-     * Atualiza a área de pré-visualização de imagens.
-     */
     const updatePreviews = () => {
         previewsArea.innerHTML = '';
         attachedFiles.forEach((file, index) => {
@@ -193,39 +168,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    /**
-     * Limpa a lista de ficheiros anexados e a pré-visualização.
-     */
     const resetAttachments = () => {
         attachedFiles = [];
         fileInput.value = '';
         previewsArea.innerHTML = '';
     };
 
-    // =================================================================
-    //  5. LÓGICA PRINCIPAL DO CHAT
-    // =================================================================
+    // --- FUNÇÃO PRINCIPAL DE ENVIO ---
 
-    /**
-     * Envia a mensagem do usuário (com texto e/ou anexos) para o backend.
-     */
     const sendMessage = async () => {
         const text = userInput.value.trim();
         if (!text && attachedFiles.length === 0) return;
 
         sendButton.disabled = true;
 
+        // Mostra a mensagem do usuário com as imagens que ele anexou
         const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
         const imageContentsForDisplay = attachedFiles.map(file => file.content);
         addMessage('user', userMessageForDisplay, { images: imageContentsForDisplay });
 
+        // Monta o payload para o backend
         const userParts = [];
         if (text) {
             userParts.push({ text: text });
         }
         attachedFiles.forEach(file => {
             userParts.push({
-                inline_data: { mime_type: file.type, data: file.base64 }
+                inline_data: {
+                    mime_type: file.type,
+                    data: file.base64
+                }
             });
         });
 
@@ -272,76 +244,74 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * Inicia ou reinicia uma conversa do zero.
-     */
+    const toggleTypingIndicator = (show) => {
+        let indicator = document.getElementById('typing-indicator');
+        if (show) {
+            if (indicator) return;
+            indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'message-wrapper bot';
+            indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
+            chatContainer.appendChild(indicator);
+            indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } else {
+            indicator?.remove();
+        }
+    };
+    
     const startNewConversation = () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
         resetAttachments();
-        const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
-        addMessage('bot', welcomeMessage);
-        chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
+        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
     };
 
-    // =================================================================
-    //  6. INICIALIZAÇÃO DA APLICAÇÃO E EVENT LISTENERS
-    // =================================================================
-
-    /**
-     * Função principal que é executada quando a página carrega.
-     */
     const initializeApp = () => {
-        // Configura handlers para dispositivos móveis
-        if (isMobileDevice()) {
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', mobileInputHandler);
-            }
+        if (window.visualViewport) {
+            mobileInputHandler();
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
         } else {
-            // Fallback para desktop para manter a altura consistente
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
             window.addEventListener('resize', () => {
                 doc.style.setProperty('--app-height', `${window.innerHeight}px`);
             });
         }
-        
-        // Configura os listeners de eventos para os botões e inputs
-        newChatBtn.addEventListener('click', startNewConversation);
-        sendButton.addEventListener('click', sendMessage);
-        userInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        attachBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', async (e) => {
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
-
-            previewsArea.innerHTML = `<p class="processing-text">Processando imagens...</p>`;
-
-            const compressionPromises = Array.from(files)
-                .filter(file => file.type.startsWith('image/'))
-                .map(file => compressImage(file));
-
-            try {
-                const compressedFiles = await Promise.all(compressionPromises);
-                attachedFiles.push(...compressedFiles);
-                updatePreviews();
-            } catch (error) {
-                console.error("Erro ao comprimir imagens:", error);
-                alert("Ocorreu um erro ao processar uma das imagens.");
-                updatePreviews();
-            }
-        });
-
-        // Inicia a primeira conversa
         startNewConversation();
     };
 
-    // Inicia a aplicação
+    // --- Event Listeners ---
+    newChatBtn.addEventListener('click', startNewConversation);
+    sendButton.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    attachBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        previewsArea.innerHTML = `<p class="processing-text">Processando imagens...</p>`;
+
+        const compressionPromises = Array.from(files)
+            .filter(file => file.type.startsWith('image/'))
+            .map(file => compressImage(file));
+
+        try {
+            const compressedFiles = await Promise.all(compressionPromises);
+            attachedFiles.push(...compressedFiles);
+            updatePreviews();
+        } catch (error) {
+            console.error("Erro ao comprimir imagens:", error);
+            alert("Ocorreu um erro ao processar uma das imagens.");
+            updatePreviews(); // Limpa a mensagem de "processando"
+        }
+    });
+
     initializeApp();
 });
