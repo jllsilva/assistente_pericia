@@ -1,9 +1,9 @@
 import { DirectoryLoader } from "@langchain/community/document_loaders/fs/directory";
 import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitters"; // Caminho corrigido
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitters";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
-import { MemoryVectorStore } from "@langchain/community/vectorstores/memory";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
 
 // Esta função irá inicializar todo o nosso motor de busca
 export async function initializeRAGEngine() {
