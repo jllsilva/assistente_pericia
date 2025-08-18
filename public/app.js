@@ -270,7 +270,29 @@ document.addEventListener('DOMContentLoaded', () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
         resetAttachments();
-        addMessage('bot', "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.");
+        fetchInitialMessage(); // Nova chamada aqui!
+    };
+
+    const fetchInitialMessage = async () => {
+        toggleTypingIndicator(true);
+        try {
+            const response = await fetch(API_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ history: [] }), // Enviamos um histórico vazio
+            });
+
+            if (!response.ok) throw new Error('Falha ao buscar a mensagem inicial do servidor.');
+
+            const responseData = await response.json();
+            toggleTypingIndicator(false);
+            addMessage('bot', responseData.reply);
+            chatHistory.push({ role: 'model', parts: [{ text: responseData.reply }] });
+
+        } catch (err) {
+            toggleTypingIndicator(false);
+            addMessage('bot', `Houve um erro ao iniciar a conversa: ${err.message}`);
+        }
     };
 
     const initializeApp = () => {
@@ -323,3 +345,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeApp();
 });
+
