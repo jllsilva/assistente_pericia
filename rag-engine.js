@@ -1,7 +1,7 @@
 import { DirectoryLoader } from "@langchain/community/document_loaders/fs/directory";
 import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "@langchain/text_splitters";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitters"; // Caminho corrigido
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { MemoryVectorStore } from "@langchain/community/vectorstores/memory";
 
@@ -22,7 +22,6 @@ export async function initializeRAGEngine() {
 
     if (docs.length === 0) {
       console.log('[RAG Engine] Nenhum documento encontrado na base de conhecimento. O servidor continuará sem conhecimento de RAG.');
-      // Retorna um retriever "falso" que não faz nada
       return { getRelevantDocuments: () => Promise.resolve([]) };
     }
 
@@ -49,7 +48,6 @@ export async function initializeRAGEngine() {
 
   } catch (error) {
     console.error('[RAG Engine] Falha ao inicializar a base de conhecimento:', error);
-    // Não encerra o processo, apenas retorna um retriever que não faz nada
     return { getRelevantDocuments: () => Promise.resolve([]) };
   }
 }
