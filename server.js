@@ -3,10 +3,10 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-// A importação foi corrigida aqui
+import multer from 'multer';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-
-// Importa nosso novo motor de RAG
 import { initializeRAGEngine } from './rag-engine.js';
 
 dotenv.config();
@@ -16,88 +16,146 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.GEMINI_API_KEY;
 
-if (!API_KEY) {
-  console.error('[ERRO CRÍTICO] Variável de ambiente GEMINI_API_KEY não definida.');
-  process.exit(1);
+// ---------- Middlewares base ----------
+app.use(cors());
+app.use(express.json({ limit: '2mb' })); // JSON para /api/generate
+app.use(express.urlencoded({ extended: true }));
+
+// ---------- Pastas públicas ----------
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES DO AGENTE HÍBRIDO ##
-Você é o "Assistente de Perícias CBMAL", uma ferramenta especialista de dupla função que atua como:
-1.  **Redator Técnico Colaborativo:** Sua missão principal é transformar os achados de campo do Perito em textos técnicos para o laudo, seguindo os modelos oficiais.
-2.  **Consultor Técnico Sob Demanda:** Sua missão secundária é responder a perguntas diretas e tirar dúvidas técnicas, consultando a base de conhecimento.
-**BASE DE CONHECIMENTO:** A sua resposta DEVE ser baseada no CONTEXTO FORNECIDO e no histórico da conversa.
-**REGRAS DE OPERAÇÃO:**
-- Se a entrada do usuário parecer uma descrição de achados ou o nome de uma seção de laudo, ative o **MODO REDATOR**.
-- Se a entrada do usuário for uma pergunta clara (contendo "?", "o que é", "qual", "como"), ative o **MODO CONSULTOR**.
-- Ao responder, sempre se baseie primeiro no contexto fornecido.`;
+// Servir estáticos e uploads
+app.use(express.static(PUBLIC_DIR));
+app.use('/uploads', express.static(UPLOAD_DIR));
 
-let ragRetriever;
-
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/health', (req, res) => {
-    res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
+// ---------- Upload de imagens (Multer) ----------
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname) || '';
+    cb(null, `${uuidv4()}${ext}`);
+  },
 });
 
-app.post('/api/generate', async (req, res) => {
-  const { history } = req.body;
-  if (!history || !Array.isArray(history) || history.length === 0) {
-    return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
-  }
+const imageOnly = (req, file, cb) => {
+  // Aceita apenas imagens comuns
+  const ok = /^image\/(png|jpe?g|webp|gif)$/.test(file.mimetype);
+  if (ok) return cb(null, true);
+  cb(new Error('Tipo de arquivo não suportado. Envie PNG, JPG, JPEG, WEBP ou GIF.'));
+};
 
+const upload = multer({
+  storage,
+  fileFilter: imageOnly,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB por arquivo
+});
+
+// ---------- RAG ----------
+let ragRetriever = null;
+
+// Endpoint de verificação
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, ragReady: !!ragRetriever });
+});
+
+// Upload de fotos (pode enviar 1+ arquivos no campo "photos")
+app.post('/api/upload', upload.array('photos', 6), (req, res) => {
   try {
-    const latestUserMessage = history[history.length - 1].parts[0].text;
-    const contextDocs = await ragRetriever.getRelevantDocuments(latestUserMessage);
-    const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
+    const files = (req.files || []).map(f => ({
+      filename: f.filename,
+      url: `/uploads/${f.filename}`,
+      size: f.size,
+      mimetype: f.mimetype,
+    }));
+    res.json({ ok: true, files });
+  } catch (err) {
+    console.error('Erro no upload:', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
 
-    const finalPrompt = `
-${SYSTEM_PROMPT}
+// Geração com suporte a contexto RAG e links de imagens
+app.post('/api/generate', async (req, res) => {
+  try {
+    const { prompt, chatHistory = [], imageUrls = [] } = req.body || {};
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Campo "prompt" é obrigatório.' });
+    }
 
-## CONTEXTO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA:
-${context}
+    // 1) Recuperar contexto da base
+    let contextText = '';
+    if (ragRetriever) {
+      const docs = await ragRetriever.getRelevantDocuments(prompt);
+      contextText = docs.map(d => d.pageContent).join('\n---\n').slice(0, 8000); // corta para evitar saídas enormes
+    }
 
-## HISTÓRICO DA CONVERSA:
-${history.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n')}
+    // 2) Montar instrução para o modelo
+    const systemPreamble = `Você é o Assistente de Perícias do CBMAL. Responda de forma objetiva e cite trechos do contexto quando relevantes.
+Se a resposta não estiver no contexto, seja transparente e diga que não encontrou.`;
 
-**Sua Resposta (model):**
-`;
-    
-    // A forma de chamar a API foi corrigida aqui
-    const chat = new ChatGoogleGenerativeAI({
-        apiKey: API_KEY,
-        modelName: "gemini-1.5-flash-latest",
+    let imagesNote = '';
+    if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+      imagesNote = `\nLinks de imagens anexadas pelo usuário:\n${imageUrls.map(u => `- ${u}`).join('\n')}\n`;
+    }
+
+    const fullPrompt = `${systemPreamble}
+
+[Contexto RAG]
+${contextText || '(sem contexto recuperado)'}
+
+[Instrução do usuário]
+${prompt}
+
+[Anexos]
+${imagesNote || '(sem anexos)'}\n`;
+
+    // 3) Chamar o modelo Gemini via LangChain
+    const model = new ChatGoogleGenerativeAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      modelName: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+      temperature: 0.3,
+      maxOutputTokens: 1024,
     });
 
-    const response = await chat.invoke(finalPrompt);
-    const reply = response.content;
+    const response = await model.invoke(fullPrompt);
+    const reply = typeof response?.content === 'string'
+      ? response.content
+      : (Array.isArray(response?.content) ? response.content.map(p => p?.text || '').join('') : 'Desculpe, não consegui gerar uma resposta.');
 
-    if (!reply) {
-      throw new Error("A API retornou uma resposta válida, mas vazia.");
-    }
-    
-    console.log(`[Sucesso] Resposta da API gerada com contexto RAG.`);
-    return res.json({ reply });
+    res.json({ ok: true, reply });
 
-  } catch (error) {
-    console.error(`[ERRO] Falha ao gerar resposta:`, error);
-    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação.` });
+  } catch (err) {
+    console.error('Erro em /api/generate:', err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
+// ---------- Rota "catch-all" DEPOIS das APIs ----------
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 async function startServer() {
-  ragRetriever = await initializeRAGEngine();
-  
-  app.listen(PORT, () => {
-    console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
-  });
+  try {
+    ragRetriever = await initializeRAGEngine();
+    app.listen(PORT, () => {
+      console.log(`Servidor do Assistente de Perícias rodando na porta ${PORT}`);
+    });
+  } catch (e) {
+    console.error('Falha ao iniciar o RAG:', e);
+    // Mesmo se RAG falhar, sobe o servidor (apenas sem contexto)
+    app.listen(PORT, () => {
+      console.log(`Servidor rodando sem RAG na porta ${PORT}`);
+    });
+  }
 }
 
 startServer();
