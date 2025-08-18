@@ -6,42 +6,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('send-button');
     const newChatBtn = document.getElementById('new-chat-btn');
     const attachBtn = document.getElementById('attach-btn');
-    const fileInput = document.getElementById('file-input');
-    const previewsArea = document.getElementById('previews-area');
-    const appContainer = document.querySelector('.app-container');
-
+    
     let chatHistory = [];
-    let attachedFiles = [];
 
-    // --- FUNÇÕES DE APOIO ---
-
-    const isMobileDevice = () => {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    };
+    const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     const mobileInputHandler = () => {
         if (!window.visualViewport) return;
-        const viewportHeight = window.visualViewport.height;
-        appContainer.style.height = `${viewportHeight}px`;
-        
+        const appHeight = window.visualViewport.height;
+        document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
         const lastMessage = chatContainer.lastElementChild;
-        if(lastMessage) {
-           lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
+        if (lastMessage) lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
     };
 
-    const initializeMobileHandlers = () => {
-        if (isMobileDevice()) {
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', handleViewportResize);
-            }
-        }
-    };
-
-    // --- FUNÇÕES DE CRIAÇÃO DE MENSAGENS ---
-
-    const addMessage = (sender, message, options = {}) => {
-        const { images = [] } = options;
+    const addMessage = (sender, message) => {
         const wrapper = document.createElement('div');
         wrapper.className = `message-wrapper ${sender}`;
         
@@ -49,18 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
         bubble.className = 'message-bubble';
         if (message.startsWith('Houve um problema de conexão')) {
             bubble.classList.add('error');
-        }
-
-        if (images.length > 0) {
-            const imagesContainer = document.createElement('div');
-            imagesContainer.className = 'message-images-container';
-            images.forEach(imgBase64 => {
-                const img = document.createElement('img');
-                img.src = imgBase64;
-                img.alt = "Imagem anexada";
-                imagesContainer.appendChild(img);
-            });
-            bubble.appendChild(imagesContainer);
         }
 
         const textContent = document.createElement('div');
@@ -71,10 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sender === 'bot') {
             const actionsWrapper = document.createElement('div');
             actionsWrapper.className = 'message-actions';
-
             const originalCopyIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>`;
             const copiedIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>`;
-
             const copyBtn = document.createElement('button');
             copyBtn.className = 'message-action-btn';
             copyBtn.title = 'Copiar Texto';
@@ -83,13 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 navigator.clipboard.writeText(message).then(() => {
                     copyBtn.innerHTML = copiedIcon;
                     copyBtn.classList.add('copied');
-                    setTimeout(() => {
-                        copyBtn.innerHTML = originalCopyIcon;
-                        copyBtn.classList.remove('copied');
-                    }, 2000);
+                    setTimeout(() => { copyBtn.innerHTML = originalCopyIcon; copyBtn.classList.remove('copied'); }, 2000);
                 });
             };
-            
             const shareBtn = document.createElement('button');
             shareBtn.className = 'message-action-btn';
             shareBtn.title = 'Compartilhar';
@@ -101,114 +61,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('A função de compartilhar não é suportada neste navegador.');
                 }
             };
-
             actionsWrapper.appendChild(copyBtn);
             if (navigator.share) {
                 actionsWrapper.appendChild(shareBtn);
             }
-            
             bubble.appendChild(actionsWrapper);
         }
         
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
-
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    // --- LÓGICA DE ANEXOS ---
-
-    const compressImage = (file, maxSize = 1280, quality = 0.7) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > maxSize) { height *= maxSize / width; width = maxSize; }
-                    } else {
-                        if (height > maxSize) { width *= maxSize / height; height = maxSize; }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
-                    resolve({
-                        name: file.name,
-                        type: 'image/jpeg',
-                        content: dataUrl,
-                        base64: dataUrl.split(',')[1] // Extrai apenas o dado Base64
-                    });
-                };
-                img.onerror = reject;
-                img.src = event.target.result;
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const updatePreviews = () => {
-        previewsArea.innerHTML = '';
-        attachedFiles.forEach((file, index) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'preview-wrapper';
-            const img = document.createElement('img');
-            img.src = file.content;
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'remove-btn';
-            removeBtn.innerHTML = '&times;';
-            removeBtn.onclick = () => {
-                attachedFiles.splice(index, 1);
-                updatePreviews();
-            };
-            wrapper.appendChild(img);
-            wrapper.appendChild(removeBtn);
-            previewsArea.appendChild(wrapper);
-        });
-    };
-
-    const resetAttachments = () => {
-        attachedFiles = [];
-        fileInput.value = '';
-        previewsArea.innerHTML = '';
-    };
-
-    // --- FUNÇÃO PRINCIPAL DE ENVIO ---
-
     const sendMessage = async () => {
         const text = userInput.value.trim();
-        if (!text && attachedFiles.length === 0) return;
+        if (!text) return;
 
         sendButton.disabled = true;
+        addMessage('user', text);
 
-        const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
-        const imageContentsForDisplay = attachedFiles.map(file => file.content);
-        addMessage('user', userMessageForDisplay, { images: imageContentsForDisplay });
+        chatHistory.push({ role: 'user', parts: [{ text }] });
 
-        const userParts = [];
-        if (text) {
-            userParts.push({ text: text });
-        }
-        attachedFiles.forEach(file => {
-            userParts.push({
-                inline_data: {
-                    mime_type: file.type,
-                    data: file.base64
-                }
-            });
-        });
-
-        chatHistory.push({ role: 'user', parts: userParts });
-
-        resetAttachments();
         userInput.value = '';
         userInput.style.height = 'auto';
         toggleTypingIndicator(true);
@@ -229,4 +102,73 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(errorData.error || "Ocorreu um erro no servidor.");
             }
 
-            const responseData = await response.j
+            const responseData = await response.json();
+            toggleTypingIndicator(false);
+            addMessage('bot', responseData.reply);
+            chatHistory.push({ role: 'model', parts: [{ text: responseData.reply }] });
+
+        } catch (err) {
+            toggleTypingIndicator(false);
+            if (err.message === "SERVER_HTML_ERROR") {
+                addMessage('bot', "Houve um problema de conexão com o servidor. Por favor, aguarde alguns segundos e tente enviar sua mensagem novamente.");
+            } else {
+                addMessage('bot', `Ocorreu um erro: ${err.message}`);
+            }
+        } finally {
+            sendButton.disabled = false;
+            if (!isMobileDevice()) {
+                userInput.focus();
+            }
+        }
+    };
+
+    const toggleTypingIndicator = (show) => {
+        let indicator = document.getElementById('typing-indicator');
+        if (show) {
+            if (indicator) return;
+            indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'message-wrapper bot';
+            indicator.innerHTML = `<div class="message-bubble"><div class="bot-typing"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
+            chatContainer.appendChild(indicator);
+            indicator.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } else {
+            indicator?.remove();
+        }
+    };
+    
+    const startNewConversation = () => {
+        chatHistory = [];
+        chatContainer.innerHTML = '';
+        const welcomeMessage = "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**.";
+        addMessage('bot', welcomeMessage);
+        chatHistory.push({ role: 'model', parts: [{ text: welcomeMessage }] });
+    };
+
+    const initializeApp = () => {
+        if (window.visualViewport) {
+            mobileInputHandler();
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
+        } else {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            window.addEventListener('resize', () => {
+                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            });
+        }
+        startNewConversation();
+    };
+
+    newChatBtn.addEventListener('click', startNewConversation);
+    sendButton.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    attachBtn.style.display = 'none';
+
+    initializeApp();
+});
