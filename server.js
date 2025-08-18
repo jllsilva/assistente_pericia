@@ -103,15 +103,21 @@ app.get('/health', (req, res) => {
 
 app.post('/api/generate', async (req, res) => {
   const { history } = req.body;
-  if (!history || !Array.isArray(history) || history.length === 0) {
-    return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
+  
+  // Permite histórico vazio para iniciar a conversa, mas exige para continuar
+  if (!history || !Array.isArray(history)) {
+    return res.status(400).json({ error: 'O histórico da conversa é inválido.' });
   }
 
   try {
-    const lastUserMessage = history[history.length - 1];
-    const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
-
-    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
+    // Se o histórico estiver vazio, preparamos uma mensagem de "início" para a IA
+    // Se não, pegamos a última mensagem do usuário como antes
+    const isFirstMessage = history.length === 0;
+    const lastUserMessage = isFirstMessage ? { role: 'user', parts: [{ text: '' }] } : history[history.length - 1];
+    
+    // O histórico para LangChain não incluirá a última mensagem do usuário
+    const langChainHistory = history.slice(0, -1).map(msg => {
+// ... resto do seu código a partir daqui permanece IGUAL    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
     const langChainHistory = history.slice(0, -1).map(msg => {
@@ -182,3 +188,4 @@ async function startServer() {
 }
 
 startServer();
+
