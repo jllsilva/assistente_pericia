@@ -43,6 +43,13 @@ Sempre inicie uma nova perícia com a pergunta abaixo.
 
 > **Pergunta Inicial:** "Bom dia, Perito. Para iniciarmos, por favor, selecione o tipo de laudo a ser confeccionado: **(1) Edificação, (2) Veículo, ou (3) Vegetação**."
 
+**## TRANSIÇÃO DA FASE 1 PARA FASE 2 ##
+Se a resposta do Perito for APENAS o número "1", "2", ou "3" (ou texto que indique um deles), você DEVE obrigatoriamente iniciar o checklist correspondente.
+- Se a resposta for "1", sua próxima ação é fazer a primeira pergunta do "CHECKLIST PARA INCÊNDIO EM EDIFICAÇÃO".
+- Se a resposta for "2", sua próxima ação é fazer a primeira pergunta do "CHECKLIST PARA INCÊNDIO EM VEÍCULO".
+- Se a resposta for "3", sua próxima ação é fazer a primeira pergunta do "CHECKLIST PARA INCÊNDIO EM VEGETAÇÃO".
+NÃO peça mais informações, apenas inicie o checklist.
+
 **FASE 2: COLETA DE DADOS ESTRUTURADA**
 Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo, fazendo uma pergunta de cada vez.
 
@@ -71,7 +78,7 @@ Com base na escolha do Perito, siga **APENAS** o checklist correspondente abaixo
 
 ---
 **FASE 3: REDAÇÃO ASSISTIDA E INTERATIVA**
-1.  **Apresente as Opções:** Após a última pergunta do checklist, anuncie a transição e APRESENTE AS OPÇÕES NUMERADAS: 
+1.  **Apresente as Opções:** Após a última pergunta do checklist, anuncie a transição e APRESENTE AS OPções NUMERADAS:
     > "Coleta de dados finalizada. Com base nas informações fornecidas, vamos redigir as seções analíticas. Qual seção deseja iniciar?
     > **(1) Descrição da Zona de Origem**
     > **(2) Descrição da Propagação**
@@ -115,11 +122,13 @@ app.post('/api/generate', async (req, res) => {
     const isFirstMessage = history.length === 0;
     const lastUserMessage = isFirstMessage ? { role: 'user', parts: [{ text: '' }] } : history[history.length - 1];
     
-    // O histórico para LangChain não incluirá a última mensagem do usuário
-    const langChainHistory = history.slice(0, -1).map(msg => {
-// ... resto do seu código a partir daqui permanece IGUAL    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
+    // Extrai o texto da última mensagem do usuário para usar no RAG
+    const textQuery = lastUserMessage.parts.find(p => 'text' in p)?.text || '';
+    
+    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
+    // Constrói o histórico para o LangChain (sem a última mensagem)
     const langChainHistory = history.slice(0, -1).map(msg => {
       const messageContent = msg.parts.map(part => {
         if ('text' in part) return part.text;
@@ -130,8 +139,8 @@ app.post('/api/generate', async (req, res) => {
         : new AIMessage(messageContent);
     });
 
+    // Constrói a nova mensagem do usuário com texto, imagens e contexto do RAG
     const newUserMessageParts = [];
-    
     newUserMessageParts.push({ 
         type: "text", 
         text: `## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}\n\n## MENSAGEM DO PERITO:` 
@@ -148,6 +157,7 @@ app.post('/api/generate', async (req, res) => {
       }
     });
 
+    // Monta o payload final para a API
     const messages = [
       new SystemMessage(SYSTEM_PROMPT),
       ...langChainHistory,
@@ -188,4 +198,3 @@ async function startServer() {
 }
 
 startServer();
-
