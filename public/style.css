@@ -237,3 +237,33 @@ html, body {
 .chat-container::-webkit-scrollbar-thumb:hover { background-color: #4b5563; }
 
 .markdown-content h1, .markdown-content h2, .markdown-content h3 { font-size: 1.15em; color: var(--accent-primary); margin-bottom: 0.5rem; }
+.preview-wrapper {
+    position: relative; /* Necessário para o botão de remover funcionar bem */
+    flex-shrink: 0; /* Impede que a miniatura seja espremida */
+}
+
+.preview-wrapper img {
+    height: 80px; /* Altura fixa para a miniatura */
+    width: 80px;  /* Largura fixa para a miniatura */
+    object-fit: cover; /* Garante que a imagem cubra a área sem distorcer */
+    border-radius: 0.5rem; /* Bordas arredondadas para um visual mais agradável */
+    display: block;
+}
+
+.preview-wrapper .remove-btn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 20px;
+}
