@@ -166,7 +166,7 @@ app.post('/api/generate', async (req, res) => {
 
     const chat = new ChatGoogleGenerativeAI({
         apiKey: API_KEY,
-        modelName: "gemini-1.5-flash-latest",
+        modelName: "gemini-2.5-flash",
     });
 
     const response = await chat.invoke(messages);
@@ -198,3 +198,4 @@ async function startServer() {
 }
 
 startServer();
+
