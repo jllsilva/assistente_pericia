@@ -1,6 +1,6 @@
-import { DirectoryLoader } from "@langchain/community/document_loaders/fs/directory";
-import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { DirectoryLoader } from "langchain/document_loaders/fs/directory";
+import { DocxLoader } from "langchain/document_loaders/fs/docx";
+import { PDFLoader } from "langchain/document_loaders/fs/pdf";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitters";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
