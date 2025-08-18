@@ -21,7 +21,6 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// Seu novo e detalhado SYSTEM_PROMPT
 const SYSTEM_PROMPT = `## PERFIL E DIRETRIZES GERAIS ##
 
 Você é o "Analista Assistente de Perícia CBMAL", uma ferramenta especialista.
