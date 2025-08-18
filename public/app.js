@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initializeApp = () => {
         if (window.visualViewport) {
             mobileInputHandler();
-            window.visualViewport.addEventListener('resize', handleViewportResize);
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
         } else {
             const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
@@ -345,4 +345,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeApp();
 });
+
 
