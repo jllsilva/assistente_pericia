@@ -97,8 +97,7 @@ html, body {
 .message-bubble { 
     position: relative;
     border-radius: 0.75rem; 
-    padding: 0.75rem; 
-    padding-bottom: 3rem; 
+    padding: 0.75rem;  
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); 
     max-width: 90%; 
 }
@@ -301,4 +300,8 @@ html, body {
   40% {
     transform: scale(1.0);
   }
+}
+
+.bot .markdown-content {
+    padding-bottom: 2.5rem; /* Cria espaço para os botões abaixo do texto */
 }
