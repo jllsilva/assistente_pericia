@@ -105,7 +105,7 @@ html, body {
 .user .message-bubble { 
     background: var(--user-bubble); 
     color: white; 
-    padding: 0.3rem 0.85rem 0.4rem;
+    padding: 0.5rem 0.85rem; /* Um padding vertical e horizontal equilibrado */
     line-height: 1.4;
 }
 .bot .message-bubble { background: var(--bot-bubble); }
@@ -307,4 +307,14 @@ html, body {
 }
 .bot .markdown-content p {
     margin-top: 0;
+}
+/* Remove a margem extra de cima e de baixo dos parágrafos em TODOS os balões */
+.markdown-content p {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Garante o espaço para os botões no balão do bot, mas de forma mais contida */
+.bot .markdown-content {
+    padding-bottom: 2.2rem; 
 }
