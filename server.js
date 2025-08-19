@@ -163,34 +163,50 @@ app.post('/api/generate', async (req, res) => {
     const lastUserMessage = history[history.length - 1] || { parts: [] };
     const textQuery = lastUserMessage.parts.find(p => p.text)?.text || '';
 
-    // 1. Usar RAG para obter contexto
+    // 1. Usar RAG para obter contexto (continua funcionando)
     const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
     const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
 
     // 2. Montar o corpo da requisição para a API nativa
+    //    Removemos o SYSTEM_PROMPT do início e o injetamos na mensagem do usuário
     const fullHistory = [
-        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-        { role: 'model', parts: [{ text: "Entendido. Estou pronto para atuar como Analista Assistente de Perícia CBMAL." }] },
         ...history
     ];
-    
-    // Adiciona o contexto do RAG à última mensagem do usuário
-    if (fullHistory.length > 2) {
+
+    // Adiciona o contexto do RAG e o SYSTEM_PROMPT à última mensagem do usuário
+    if (fullHistory.length > 0) {
         const lastMessageWithContext = fullHistory[fullHistory.length - 1];
-        const contextPart = { text: `\n\n## CONTEXTO DA BASE DE CONHECIMENTO:\n${context}` };
         
-        if (lastMessageWithContext.parts && Array.isArray(lastMessageWithContext.parts)) {
-            lastMessageWithContext.parts.unshift(contextPart);
-        } else {
-            lastMessageWithContext.parts = [contextPart];
-        }
+        // Cria um novo objeto de partes para evitar modificar o original
+        const newParts = [...lastMessageWithContext.parts];
+
+        // Adiciona o prompt do sistema e o contexto no início da última mensagem
+        const instructionPart = { 
+            text: `
+CONTEXTO DA BASE DE CONHECIMENTO:
+${context}
+---
+INSTRUÇÕES DO SISTEMA (SEMPRE SIGA):
+${SYSTEM_PROMPT}
+---
+MENSAGEM DO PERITO:
+` 
+        };
+        newParts.unshift(instructionPart);
+        
+        // Atualiza a última mensagem com as novas partes
+        fullHistory[fullHistory.length - 1] = { ...lastMessageWithContext, parts: newParts };
+    } else {
+        // Se a conversa for a primeira, envia apenas o SYSTEM_PROMPT
+        fullHistory.push({ role: 'user', parts: [{ text: SYSTEM_PROMPT }] });
     }
+
 
     const body = { 
         contents: fullHistory,
     };
 
-    // 3. Fazer a chamada direta à API com node-fetch
+    // 3. Fazer a chamada direta à API
     const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,21 +221,20 @@ app.post('/api/generate', async (req, res) => {
 
     const data = await apiResponse.json();
     
-    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts) {
+    if (!data.candidates || data.candidates.length === 0) {
         if (data.promptFeedback && data.promptFeedback.blockReason) {
-            console.warn(`[AVISO] Resposta bloqueada por segurança: ${data.promptFeedback.blockReason}`);
-            throw new Error(`A resposta foi bloqueada por razões de segurança: ${data.promptFeedback.blockReason}`);
+            throw new Error(`Resposta bloqueada por segurança: ${data.promptFeedback.blockReason}`);
         }
-        throw new Error("A API retornou uma resposta em formato inesperado ou vazia.");
+        throw new Error("A API retornou uma resposta vazia.");
     }
     
     const reply = data.candidates[0].content.parts[0].text;
 
     if (reply === undefined || reply === null) {
-      throw new Error("A API retornou uma resposta válida, mas sem conteúdo de texto.");
+      throw new Error("A API retornou uma resposta válida, mas sem texto.");
     }
     
-    console.log(`[Sucesso] Resposta da API gerada com método direto.`);
+    console.log(`[Sucesso] Resposta da API gerada com método direto e prompt injetado.`);
     return res.json({ reply });
 
   } catch (error) {
@@ -227,7 +242,6 @@ app.post('/api/generate', async (req, res) => {
     res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação: ${error.message}` });
   }
 });
-
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -241,5 +255,6 @@ async function startServer() {
 }
 
 startServer();
+
 
 
