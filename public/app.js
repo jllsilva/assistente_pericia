@@ -311,7 +311,15 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
+    
+    userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto'; // Reseta a altura
+    // Define a nova altura com base no conteúdo, mas sem passar do limite
+    const newHeight = Math.min(userInput.scrollHeight, 150); // 150px é o max-height do seu CSS
+    userInput.style.height = `${newHeight}px`;
+});
 
+attachBtn.addEventListener('click', () => fileInput.click());
     attachBtn.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', async (e) => {
@@ -337,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeApp();
 });
+
 
 
 
