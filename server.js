@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
+import { Packer, Document, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { initializeRAGEngine } from './rag-engine.js';
 
 dotenv.config();
@@ -14,7 +15,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.GEMINI_API_KEY;
-const API_MODEL = 'gemini-2.5-flash-preview-05-20'; // Usando o modelo que você confirmou que funciona
+const API_MODEL = 'gemini-2.5-flash-preview-05-20';
 
 if (!API_KEY) {
   console.error('[ERRO CRÍTICO] Variável de ambiente GEMINI_API_KEY não definida.');
@@ -159,7 +160,7 @@ Se o Perito solicitar "RELATÓRIO FINAL" ou "COMPILAR TUDO", sua tarefa é:
 - **Ação Inicial:** Ao entrar neste modo, responda com: "Estou à disposição para suas dúvidas, análises ou para debatermos um caso específico. Como posso ajudar?"
 - **Diretriz Contínua:** Permaneça neste modo de diálogo aberto, respondendo diretamente a cada pergunta do perito, até que uma nova perícia seja iniciada. Não tente iniciar nenhum checklist.
 */
-`;
+`; 
 
 let ragRetriever;
 
@@ -171,109 +172,84 @@ app.get('/health', (req, res) => {
     res.status(200).send('Servidor do Assistente de Perícias está ativo e saudável.');
 });
 
+// COLE SUA ROTA /api/generate COMPLETA AQUI
 app.post('/api/generate', async (req, res) => {
-  const { history } = req.body;
-  if (!history) {
-    return res.status(400).json({ error: 'O histórico da conversa é obrigatório.' });
-  }
-
-  try {
-    const lastUserMessage = history[history.length - 1] || { parts: [] };
-    const textQuery = lastUserMessage.parts.find(p => p.text)?.text || '';
-
-    // 1. Usar RAG para obter contexto (continua funcionando)
-    const contextDocs = await ragRetriever.getRelevantDocuments(textQuery);
-    const context = contextDocs.map(doc => doc.pageContent).join('\n---\n');
-
-    // 2. Montar o corpo da requisição para a API nativa
-    //    Removemos o SYSTEM_PROMPT do início e o injetamos na mensagem do usuário
-    const fullHistory = [
-        ...history
-    ];
-
-    // Adiciona o contexto do RAG e o SYSTEM_PROMPT à última mensagem do usuário
-    if (fullHistory.length > 0) {
-        const lastMessageWithContext = fullHistory[fullHistory.length - 1];
-        
-        // Cria um novo objeto de partes para evitar modificar o original
-        const newParts = [...lastMessageWithContext.parts];
-
-        // Adiciona o prompt do sistema e o contexto no início da última mensagem
-        const instructionPart = { 
-            text: `
-CONTEXTO DA BASE DE CONHECIMENTO:
-${context}
----
-INSTRUÇÕES DO SISTEMA (SEMPRE SIGA):
-${SYSTEM_PROMPT}
----
-MENSAGEM DO PERITO:
-` 
-        };
-        newParts.unshift(instructionPart);
-        
-        // Atualiza a última mensagem com as novas partes
-        fullHistory[fullHistory.length - 1] = { ...lastMessageWithContext, parts: newParts };
-    } else {
-        // Se a conversa for a primeira, envia apenas o SYSTEM_PROMPT
-        fullHistory.push({ role: 'user', parts: [{ text: SYSTEM_PROMPT }] });
-    }
-
-
-    const body = { 
-        contents: fullHistory,
-    };
-
-    // 3. Fazer a chamada direta à API
-    const apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30000)
-    });
-
-    if (!apiResponse.ok) {
-        const errorData = await apiResponse.json();
-        throw new Error(errorData.error?.message || `API Error: ${apiResponse.status}`);
-    }
-
-    const data = await apiResponse.json();
-    
-    if (!data.candidates || data.candidates.length === 0) {
-        if (data.promptFeedback && data.promptFeedback.blockReason) {
-            throw new Error(`Resposta bloqueada por segurança: ${data.promptFeedback.blockReason}`);
-        }
-        throw new Error("A API retornou uma resposta vazia.");
-    }
-    
-    const reply = data.candidates[0].content.parts[0].text;
-
-    if (reply === undefined || reply === null) {
-      throw new Error("A API retornou uma resposta válida, mas sem texto.");
-    }
-    
-    console.log(`[Sucesso] Resposta da API gerada com método direto e prompt injetado.`);
-    return res.json({ reply });
-
-  } catch (error) {
-    console.error(`[ERRO] Falha ao gerar resposta:`, error);
-    res.status(503).json({ error: `Ocorreu um erro ao processar sua solicitação: ${error.message}` });
-  }
+  // ... seu código da rota de chat principal ...
 });
+
+// --- NOVA ROTA PARA GERAR O DOCX ---
+app.post('/api/generate-docx', async (req, res) => {
+    const { markdown } = req.body;
+    if (!markdown) {
+        return res.status(400).send('Conteúdo Markdown é obrigatório.');
+    }
+
+    try {
+        const doc = new Document({
+            sections: [{
+                properties: {},
+                children: markdownToDocx(markdown), // Usamos a função auxiliar
+            }],
+        });
+
+        const buffer = await Packer.toBuffer(doc);
+
+        res.setHeader('Content-Disposition', 'attachment; filename=LaudoPericial.docx');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.send(buffer);
+        console.log('[Sucesso] Documento .docx gerado e enviado.');
+
+    } catch (error) {
+        console.error('[ERRO] Falha ao gerar .docx:', error);
+        res.status(500).send('Erro ao gerar o documento.');
+    }
+});
+
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 async function startServer() {
   ragRetriever = await initializeRAGEngine();
-  
   app.listen(PORT, () => {
     console.log(`Servidor do Assistente de Perícias a rodar na porta ${PORT}.`);
   });
 }
 
+// --- FUNÇÃO AUXILIAR PARA CONVERTER MARKDOWN ---
+function markdownToDocx(markdown) {
+    const children = [];
+    const lines = markdown.split('\n');
+
+    lines.forEach(line => {
+        // Converte títulos (ex: # Título)
+        if (line.startsWith('# ')) {
+            children.push(new Paragraph({
+                text: line.substring(2),
+                heading: HeadingLevel.HEADING_1,
+                spacing: { after: 200 },
+            }));
+            return;
+        }
+
+        // Trata parágrafos vazios como espaçamento
+        if (line.trim() === '') {
+            children.push(new Paragraph(""));
+            return;
+        }
+
+        // Trata parágrafos com texto em negrito (ex: texto **negrito** aqui)
+        const parts = line.split('**');
+        const textRuns = parts.map((part, index) => {
+            const isBold = index % 2 === 1;
+            return new TextRun({ text: part, bold: isBold });
+        });
+
+        children.push(new Paragraph({ children: textRuns }));
+    });
+
+    return children;
+}
+
 startServer();
-
-
-
-
