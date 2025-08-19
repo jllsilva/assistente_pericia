@@ -267,3 +267,38 @@ html, body {
     font-size: 14px;
     line-height: 20px;
 }
+
+.bot-typing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  margin: 0 4px;
+  background-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: typing-animation 1.4s infinite ease-in-out both;
+}
+
+/* Adiciona um atraso diferente para cada ponto, criando o efeito de onda */
+.typing-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+/* Animação que faz os pontos crescerem e diminuirem */
+@keyframes typing-animation {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1.0);
+  }
+}
