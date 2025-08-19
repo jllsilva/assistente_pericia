@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
-        if (message.startsWith('Houve um problema de conexão')) {
+        if (message.startsWith('Houve um problema')) {
             bubble.classList.add('error');
         }
 
@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const actionsWrapper = document.createElement('div');
             actionsWrapper.className = 'message-actions';
 
+            // Variáveis dos ícones que estavam faltando
             const originalCopyIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>`;
             const copiedIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>`;
 
@@ -82,21 +83,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             };
             
-            const shareBtn = document.createElement('button');
-            shareBtn.className = 'message-action-btn';
-            shareBtn.title = 'Compartilhar';
-            shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>`;
-            shareBtn.onclick = () => {
-                if (navigator.share) {
-                    navigator.share({ text: message });
-                } else {
-                    alert('A função de compartilhar não é suportada neste navegador.');
-                }
-            };
-
             actionsWrapper.appendChild(copyBtn);
-            if (navigator.share) {
-                actionsWrapper.appendChild(shareBtn);
+
+            // --- LÓGICA DO BOTÃO DE DOWNLOAD ---
+            if (message.toUpperCase().includes('CONCLUSÃO')) {
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'message-action-btn';
+                downloadBtn.title = 'Baixar Laudo (.docx)';
+                downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>`;
+                
+                downloadBtn.onclick = async () => {
+                    downloadBtn.innerHTML = '...'; // Indicador de carregamento
+                    try {
+                        const response = await fetch('/api/generate-docx', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ markdown: message }),
+                        });
+
+                        if (!response.ok) throw new Error('Falha ao gerar o arquivo.');
+
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = 'LaudoPericial.docx';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        a.remove();
+
+                    } catch (err) {
+                        console.error('Erro no download:', err);
+                        alert('Não foi possível baixar o arquivo.');
+                    } finally {
+                        // Restaura o ícone original
+                        downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>`;
+                    }
+                };
+                actionsWrapper.appendChild(downloadBtn);
             }
             
             bubble.appendChild(actionsWrapper);
@@ -104,7 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         wrapper.appendChild(bubble);
         chatContainer.appendChild(wrapper);
-
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -181,12 +206,10 @@ document.addEventListener('DOMContentLoaded', () => {
         userInput.blur();
         sendButton.disabled = true;
 
-        // Mostra a mensagem do usuário com as imagens que ele anexou
         const userMessageForDisplay = text || `Analisar ${attachedFiles.length} imagem(s)`;
         const imageContentsForDisplay = attachedFiles.map(file => file.content);
         addMessage('user', userMessageForDisplay, { images: imageContentsForDisplay });
 
-        // Monta o payload para o backend
         const userParts = [];
         if (text) {
             userParts.push({ text: text });
@@ -262,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatHistory = [];
         chatContainer.innerHTML = '';
         resetAttachments();
-        fetchInitialMessage(); // Nova chamada aqui!
+        fetchInitialMessage();
     };
 
     const fetchInitialMessage = async () => {
@@ -271,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ history: [] }), // Enviamos um histórico vazio
+                body: JSON.stringify({ history: [] }),
             });
 
             if (!response.ok) throw new Error('Falha ao buscar a mensagem inicial do servidor.');
@@ -288,23 +311,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const initializeApp = () => {
-    if (window.visualViewport) {
-        mobileInputHandler(); // Executa uma vez ao carregar
-        window.visualViewport.addEventListener('resize', mobileInputHandler); // E de novo sempre que a tela mudar de tamanho
-    } else {
-        const doc = document.documentElement;
-        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-        window.addEventListener('resize', () => {
+        if (window.visualViewport) {
+            mobileInputHandler();
+            window.visualViewport.addEventListener('resize', mobileInputHandler);
+        } else {
+            const doc = document.documentElement;
             doc.style.setProperty('--app-height', `${window.innerHeight}px`);
-        });
-    }
-    startNewConversation();
-    // A chamada para initializeMobileHandlers() pode ser removida daqui
-};
+            window.addEventListener('resize', () => {
+                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+            });
+        }
+        startNewConversation();
+    };
 
     // --- Event Listeners ---
     newChatBtn.addEventListener('click', startNewConversation);
     sendButton.addEventListener('click', sendMessage);
+    
     userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -313,13 +336,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     userInput.addEventListener('input', () => {
-    userInput.style.height = 'auto'; // Reseta a altura
-    // Define a nova altura com base no conteúdo, mas sem passar do limite
-    const newHeight = Math.min(userInput.scrollHeight, 150); // 150px é o max-height do seu CSS
-    userInput.style.height = `${newHeight}px`;
-});
+        userInput.style.height = 'auto';
+        const newHeight = Math.min(userInput.scrollHeight, 150);
+        userInput.style.height = `${newHeight}px`;
+    });
 
-attachBtn.addEventListener('click', () => fileInput.click());
     attachBtn.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', async (e) => {
@@ -345,9 +366,3 @@ attachBtn.addEventListener('click', () => fileInput.click());
 
     initializeApp();
 });
-
-
-
-
-
-
