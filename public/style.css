@@ -153,6 +153,13 @@ html, body {
     font-size: 0.9rem;
     max-height: 150px; 
     overflow-y: auto; 
+    
+    /* --- CORREÇÃO PARA O TEXTO CORTADO --- */
+    white-space: nowrap;      /* Impede que o placeholder quebre a linha */
+    overflow-x: hidden;       /* Esconde o que transborda */
+    text-overflow: ellipsis;  /* Adiciona "..." ao final do texto cortado */
+    -ms-overflow-style: none; /* Esconde a barra de rolagem no IE e Edge */
+    scrollbar-width: none;    /* Esconde a barra de rolagem no Firefox */
 }
 .user-input:focus { outline: none; }
 
@@ -329,3 +336,4 @@ html, body {
     scrollbar-width: none;  /* Para Firefox */
     overflow-x: hidden; /* Garante que o conteúdo não force uma barra horizontal */
 }
+
