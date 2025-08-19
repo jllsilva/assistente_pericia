@@ -116,7 +116,8 @@ html, body {
 
 .markdown-content { position: relative; }
 
-.markdown-content strong, .markdown-content b {
+.bot .message-bubble .markdown-content strong,
+.bot .message-bubble .markdown-content b {
     color: var(--accent-primary);
 }
 
@@ -336,4 +337,5 @@ html, body {
     scrollbar-width: none;  /* Para Firefox */
     overflow-x: hidden; /* Garante que o conteúdo não force uma barra horizontal */
 }
+
 
