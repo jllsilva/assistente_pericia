@@ -318,3 +318,14 @@ html, body {
 .bot .markdown-content {
     padding-bottom: 2.2rem; 
 }
+
+/* Esconde a barra de rolagem padrão no textarea */
+.user-input::-webkit-scrollbar {
+    display: none; /* Para Chrome, Safari, Opera */
+}
+
+.user-input {
+    -ms-overflow-style: none;  /* Para IE e Edge */
+    scrollbar-width: none;  /* Para Firefox */
+    overflow-x: hidden; /* Garante que o conteúdo não force uma barra horizontal */
+}
