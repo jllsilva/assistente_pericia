@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendMessage = async () => {
         const text = userInput.value.trim();
         if (!text && attachedFiles.length === 0) return;
-
+        userInput.blur();
         sendButton.disabled = true;
 
         // Mostra a mensagem do usuário com as imagens que ele anexou
@@ -345,6 +345,7 @@ attachBtn.addEventListener('click', () => fileInput.click());
 
     initializeApp();
 });
+
 
 
 
